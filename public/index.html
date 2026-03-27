@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KDP Book Maker | Professional Book Publishing Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Karla:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<style>
+:root {
+  --bg-deep: #08080f;
+  --bg-primary: #0d0d16;
+  --bg-surface: #13131f;
+  --bg-card: #1a1a2c;
+  --bg-card-hover: #22223a;
+  --bg-input: #161624;
+  --accent: #c9a84c;
+  --accent-light: #e8c468;
+  --accent-dim: #8a6d2b;
+  --accent-glow: rgba(201,168,76,0.15);
+  --text-primary: #f0ebe3;
+  --text-secondary: #8a8595;
+  --text-muted: #5a5568;
+  --border: #2a2a3c;
+  --border-light: #35354a;
+  --success: #4ade80;
+  --error: #f87171;
+  --warning: #fbbf24;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+html.light {
+  --bg-deep: #f5f2ec;
+  --bg-primary: #faf7f2;
+  --bg-surface: #f0ede6;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8f5ef;
+  --bg-input: #f5f2ec;
+  --accent: #9a7429;
+  --accent-light: #c9a84c;
+  --accent-dim: #7a5a1a;
+  --accent-glow: rgba(154,116,41,0.1);
+  --text-primary: #1a1518;
+  --text-secondary: #6a6270;
+  --text-muted: #9a9290;
+  --border: #e0dcd4;
+  --border-light: #d5d0c8;
+  --shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { font-size:16px; scroll-behavior:smooth; }
+body {
+  font-family:'Karla',sans-serif;
+  background:var(--bg-deep);
+  color:var(--text-primary);
+  min-height:100vh;
+  overflow-x:hidden;
+  line-height:1.6;
+}
+h1,h2,h3,h4 { font-family:'Cormorant Garamond',serif; font-weight:600; line-height:1.2; }
+.accent { color:var(--accent); }
+body::before {
+  content:'';
+  position:fixed; top:0; left:0; right:0; bottom:0;
+  background:
+    radial-gradient(ellipse at 20% 50%, var(--accent-glow) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(100,80,200,0.05) 0%, transparent 50%);
+  pointer-events:none; z-index:0;
+}
+#app { position:relative; z-index:1; min-height:100vh; display:flex; flex-direction:column; }
+.header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 24px;
+  background:var(--bg-surface);
+  border-bottom:1px solid var(--border);
+  position:sticky; top:0; z-index:100;
+  backdrop-filter:blur(12px);
+  flex-wrap:wrap; gap:8px;
+}
+.logo { display:flex; align-items:center; gap:12px; cursor:pointer; }
+.logo-icon {
+  width:42px; height:42px;
+  background:linear-gradient(135deg, var(--accent), var(--accent-dim));
+  border-radius:10px; display:flex; align-items:center; justify-content:center;
+  font-size:20px; color:#fff; font-weight:700;
+  box-shadow:0 2px 12px rgba(201,168,76,0.3);
+}
+.logo-text { font-family:'Cormorant Garamond',serif; font-size:1.5rem; font-weight:700; letter-spacing:-0.5px; }
+.logo-text span { color:var(--accent); }
+.header-nav { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.nav-btn {
+  background:transparent; border:1px solid var(--border);
+  color:var(--text-secondary); padding:8px 16px; border-radius:8px;
+  font-family:'Karla',sans-serif; font-size:0.85rem; cursor:pointer;
+  transition:var(--transition);
+}
+.nav-btn:hover { border-color:var(--accent); color:var(--accent); }
+.nav-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.user-badge {
+  display:flex; align-items:center; gap:8px;
+  background:var(--bg-card); border:1px solid var(--border);
+  padding:6px 14px; border-radius:8px; font-size:0.82rem; color:var(--text-secondary);
+}
+.user-badge .sub-tag {
+  background:var(--accent); color:#000; padding:2px 8px; border-radius:4px;
+  font-size:0.7rem; font-weight:700; text-transform:uppercase;
+}
+.user-badge .sub-tag.free { background:var(--text-muted); color:#fff; }
+.main { flex:1; padding:24px; max-width:1100px; margin:0 auto; width:100%; }
+.panel { display:none; animation:fadeUp 0.35s ease; }
+.panel.active { display:block; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+@keyframes pulse { 0%,100% { opacity:0.6; } 50% { opacity:1; } }
+.dashboard { text-align:center; }
+.hero { margin-bottom:40px; }
+.hero h1 { font-size:2.5rem; margin-bottom:12px; }
+.hero p { color:var(--text-secondary); font-size:1.05rem; max-width:600px; margin:0 auto; }
+.feature-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:20px; }
+.feature-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:28px 24px; text-align:left; cursor:pointer; transition:var(--transition);
+}
+.feature-card:hover { border-color:var(--accent); transform:translateY(-4px); box-shadow:0 8px 30px rgba(201,168,76,0.1); }
+.card-icon { font-size:1.8rem; color:var(--accent); margin-bottom:14px; }
+.feature-card h3 { font-size:1.25rem; margin-bottom:8px; }
+.feature-card p { color:var(--text-secondary); font-size:0.88rem; line-height:1.5; }
+.panel-header { display:flex; align-items:center; gap:14px; margin-bottom:24px; }
+.panel-header h2 { font-size:1.6rem; }
+.back-btn {
+  background:var(--bg-card); border:1px solid var(--border); color:var(--text-secondary);
+  width:40px; height:40px; border-radius:10px; cursor:pointer; font-size:1rem;
+  display:flex; align-items:center; justify-content:center; transition:var(--transition);
+}
+.back-btn:hover { border-color:var(--accent); color:var(--accent); }
+.section-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:24px; margin-bottom:24px;
+}
+.section-card h3 { font-size:1.15rem; margin-bottom:16px; display:flex; align-items:center; gap:10px; }
+.form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.form-group { display:flex; flex-direction:column; gap:6px; }
+.form-group.full { grid-column:1/-1; }
+.form-label { font-size:0.85rem; font-weight:500; color:var(--text-secondary); }
+.form-input, .form-select, .form-textarea {
+  background:var(--bg-input); border:1px solid var(--border); border-radius:8px;
+  padding:12px 14px; color:var(--text-primary); font-family:'Karla',sans-serif;
+  font-size:1rem; transition:var(--transition); width:100%;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-glow); }
+.form-textarea { resize:vertical; min-height:80px; }
+.form-hint { font-size:0.78rem; color:var(--text-muted); }
+.btn {
+  display:inline-flex; align-items:center; gap:8px; padding:12px 24px;
+  border:none; border-radius:8px; font-family:'Karla',sans-serif;
+  font-size:0.92rem; font-weight:600; cursor:pointer; transition:var(--transition);
+}
+.btn:disabled { opacity:0.5; cursor:not-allowed; }
+.btn-primary { background:linear-gradient(135deg, var(--accent), var(--accent-dim)); color:#fff; }
+.btn-primary:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 4px 16px rgba(201,168,76,0.3); }
+.btn-secondary { background:var(--bg-surface); color:var(--text-primary); border:1px solid var(--border); }
+.btn-danger { background:var(--error); color:#fff; }
+.btn-sm { padding:8px 16px; font-size:0.82rem; }
+.hidden { display:none !important; }
+.progress-container {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:20px; margin-bottom:20px;
+}
+.progress-bar-wrap { background:var(--bg-input); border-radius:6px; height:8px; overflow:hidden; margin-bottom:12px; }
+.progress-bar { height:100%; background:linear-gradient(90deg, var(--accent), var(--accent-light)); border-radius:6px; transition:width 0.4s ease; width:0; }
+.progress-text { display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-secondary); }
+.spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; vertical-align:middle; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.preview-section { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:24px; }
+.preview-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
+.preview-container { max-height:500px; overflow-y:auto; padding:8px; }
+.preview-page {
+  background:var(--bg-surface); border:1px solid var(--border); border-radius:8px;
+  padding:24px; margin-bottom:12px; position:relative;
+}
+.preview-page h2 { font-size:1.2rem; margin-bottom:10px; color:var(--accent); }
+.preview-page-num { position:absolute; bottom:8px; right:12px; font-size:0.75rem; color:var(--text-muted); }
+.preview-image-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; }
+.preview-image-grid img { width:100%; border-radius:8px; border:1px solid var(--border); }
+.cover-preview-wrap { text-align:center; }
+.cover-preview-img { max-width:100%; max-height:400px; border-radius:8px; border:1px solid var(--border); margin-bottom:16px; }
+.cover-specs { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+.cover-spec { background:var(--bg-surface); border:1px solid var(--border); border-radius:6px; padding:6px 14px; font-size:0.82rem; }
+.keyword-results { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:24px; }
+.keyword-item {
+  display:flex; align-items:center; gap:12px; padding:12px 16px;
+  background:var(--bg-surface); border:1px solid var(--border); border-radius:8px;
+  margin-bottom:8px; transition:var(--transition);
+}
+.keyword-item:hover { border-color:var(--accent-dim); }
+.keyword-num {
+  background:var(--accent); color:#000; width:28px; height:28px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.8rem; flex-shrink:0;
+}
+.keyword-text { flex:1; font-size:0.95rem; }
+.keyword-copy {
+  background:var(--bg-card); border:1px solid var(--border); color:var(--text-secondary);
+  padding:6px 14px; border-radius:6px; font-size:0.8rem; cursor:pointer; transition:var(--transition);
+  font-family:'Karla',sans-serif; white-space:nowrap;
+}
+.keyword-copy:hover { border-color:var(--accent); color:var(--accent); }
+.keyword-copy.copied { background:var(--success); color:#fff; border-color:var(--success); }
+.copy-all-bar {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:16px; background:var(--bg-surface); border:1px solid var(--accent-dim);
+  border-radius:8px; margin-top:16px;
+}
+/* Pricing */
+.pricing-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:20px; margin-top:20px; }
+.pricing-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:32px 24px; text-align:center; position:relative; transition:var(--transition);
+}
+.pricing-card.featured { border-color:var(--accent); box-shadow:0 0 30px var(--accent-glow); transform:scale(1.03); }
+.pricing-badge {
+  position:absolute; top:-12px; left:50%; transform:translateX(-50%);
+  background:var(--accent); color:#000; padding:4px 18px; border-radius:20px;
+  font-size:0.78rem; font-weight:700; text-transform:uppercase;
+}
+.pricing-card h3 { font-size:1.5rem; margin-bottom:6px; }
+.pricing-desc { color:var(--text-secondary); font-size:0.88rem; margin-bottom:16px; }
+.pricing-price { margin-bottom:20px; }
+.pricing-price .amount { font-size:2.8rem; font-family:'Cormorant Garamond',serif; font-weight:700; color:var(--accent); }
+.pricing-price .period { font-size:0.9rem; color:var(--text-secondary); }
+.save-tag { display:inline-block; background:var(--success); color:#000; padding:2px 10px; border-radius:4px; font-size:0.75rem; font-weight:600; margin-top:6px; }
+.pricing-features { list-style:none; text-align:left; margin-bottom:24px; }
+.pricing-features li { padding:6px 0; font-size:0.88rem; color:var(--text-secondary); display:flex; align-items:flex-start; gap:8px; }
+.pricing-features li i { color:var(--success); margin-top:3px; font-size:0.8rem; }
+.pricing-btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  width:100%; padding:14px; border-radius:8px; font-family:'Karla',sans-serif;
+  font-size:0.95rem; font-weight:600; text-decoration:none; transition:var(--transition);
+}
+.pricing-btn-primary { background:linear-gradient(135deg,var(--accent),var(--accent-dim)); color:#fff; }
+.pricing-btn-primary:hover { transform:translateY(-2px); box-shadow:0 4px 20px rgba(201,168,76,0.3); }
+.pricing-btn-outline { background:transparent; border:2px solid var(--accent); color:var(--accent); }
+.pricing-btn-outline:hover { background:var(--accent); color:#fff; }
+/* Admin */
+.admin-table { width:100%; border-collapse:collapse; font-size:0.88rem; }
+.admin-table th, .admin-table td { padding:10px 14px; text-align:left; border-bottom:1px solid var(--border); }
+.admin-table th { color:var(--text-muted); font-weight:600; font-size:0.78rem; text-transform:uppercase; }
+.admin-table select { background:var(--bg-input); border:1px solid var(--border); color:var(--text-primary); padding:4px 8px; border-radius:4px; font-size:0.82rem; }
+/* Auth Modal */
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex;
+  align-items:center; justify-content:center; z-index:999; backdrop-filter:blur(4px);
+}
+.modal-box {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:32px; max-width:420px; width:90%; box-shadow:var(--shadow);
+}
+.modal-box h3 { font-size:1.5rem; margin-bottom:6px; }
+.modal-box p { color:var(--text-secondary); font-size:0.9rem; margin-bottom:20px; }
+.modal-actions { display:flex; gap:10px; margin-top:16px; }
+.auth-form .form-group { margin-bottom:14px; }
+.auth-toggle { text-align:center; margin-top:14px; font-size:0.88rem; color:var(--text-secondary); }
+.auth-toggle a { color:var(--accent); cursor:pointer; text-decoration:underline; }
+.auth-error { background:rgba(248,113,113,0.1); border:1px solid var(--error); color:var(--error); padding:10px 14px; border-radius:8px; font-size:0.85rem; margin-bottom:14px; }
+/* Toast */
+.toast-container { position:fixed; bottom:20px; right:20px; z-index:1000; display:flex; flex-direction:column; gap:8px; }
+.toast {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:8px;
+  padding:12px 20px; font-size:0.88rem; box-shadow:var(--shadow);
+  display:flex; align-items:center; gap:10px; animation:fadeUp 0.3s ease;
+  transition:opacity 0.3s, transform 0.3s;
+}
+.toast.success { border-left:3px solid var(--success); }
+.toast.error { border-left:3px solid var(--error); }
+.toast.info { border-left:3px solid var(--accent); }
+/* Responsive */
+@media (max-width:768px) {
+  .header { padding:12px 16px; }
+  .main { padding:16px; }
+  .hero h1 { font-size:1.8rem; }
+  .form-grid { grid-template-columns:1fr; }
+  .feature-grid { grid-template-columns:1fr; }
+  .pricing-grid { grid-template-columns:1fr; }
+  .pricing-card.featured { transform:none; }
+  .copy-all-bar { flex-direction:column; gap:10px; text-align:center; }
+  .keyword-item { flex-wrap:wrap; }
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header class="header">
+    <div class="logo" onclick="navigate('dashboard')">
+      <div class="logo-icon"><i class="fas fa-book"></i></div>
+      <div class="logo-text">KDP <span>BookMaker</span></div>
+    </div>
+    <nav class="header-nav" id="mainNav">
+      <button class="nav-btn active" data-view="dashboard" onclick="navigate('dashboard')"><i class="fas fa-home"></i> Home</button>
+      <button class="nav-btn" data-view="book" onclick="navigate('book')"><i class="fas fa-book-open"></i> Books</button>
+      <button class="nav-btn" data-view="cover" onclick="navigate('cover')"><i class="fas fa-palette"></i> Covers</button>
+      <button class="nav-btn" data-view="keywords" onclick="navigate('keywords')"><i class="fas fa-magnifying-glass"></i> Keywords</button>
+      <button class="nav-btn" data-view="pricing" onclick="navigate('pricing')"><i class="fas fa-crown"></i> Pricing</button>
+      <button class="nav-btn hidden" id="navAdmin" data-view="admin" onclick="navigate('admin')"><i class="fas fa-shield"></i> Admin</button>
+      <div class="user-badge hidden" id="userBadge">
+        <i class="fas fa-user"></i> <span id="userEmail">user</span>
+        <span class="sub-tag" id="userSubTag">FREE</span>
+        <button class="nav-btn" onclick="logout()" style="padding:4px 10px;font-size:0.78rem"><i class="fas fa-sign-out-alt"></i></button>
+      </div>
+      <button class="btn btn-primary btn-sm" id="loginBtn" onclick="showAuthModal('login')"><i class="fas fa-sign-in-alt"></i> Login</button>
+    </nav>
+  </header>
+
+  <div class="main">
+    <!-- Dashboard -->
+    <div id="view-dashboard" class="panel active">
+      <div class="dashboard">
+        <div class="hero">
+          <h1>Create <span class="accent">Professional</span> Books for KDP</h1>
+          <p>Generate complete books, professional covers, and Amazon keywords — everything ready for Kindle Direct Publishing.</p>
+        </div>
+        <div class="feature-grid">
+          <div class="feature-card" onclick="navigate('book')">
+            <div class="card-icon"><i class="fas fa-book-open"></i></div>
+            <h3>Book Generator</h3>
+            <p>Novels, coloring books, mandalas, health, magazines and more. Prompt-based generation with KDP-ready PDF export.</p>
+          </div>
+          <div class="feature-card" onclick="navigate('cover')">
+            <div class="card-icon"><i class="fas fa-palette"></i></div>
+            <h3>Cover Generator</h3>
+            <p>Complete covers with front, back and spine. All KDP dimensions with trim area and bleed included.</p>
+          </div>
+          <div class="feature-card" onclick="navigate('keywords')">
+            <div class="card-icon"><i class="fas fa-magnifying-glass"></i></div>
+            <h3>Amazon Keywords</h3>
+            <p>7 optimized keywords based on Amazon search bar data. Copy and paste directly into your KDP listing.</p>
+          </div>
+          <div class="feature-card" onclick="navigate('pricing')">
+            <div class="card-icon"><i class="fas fa-crown"></i></div>
+            <h3>Subscription Plans</h3>
+            <p>Unlock the full power of KDP Book Maker. Choose a plan that fits your publishing goals.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Book Generator -->
+    <div id="view-book" class="panel">
+      <div class="panel-header">
+        <button class="back-btn" onclick="navigate('dashboard')"><i class="fas fa-arrow-left"></i></button>
+        <h2><i class="fas fa-book accent"></i> Book Generator</h2>
+      </div>
+      <div class="section-card">
+        <h3><i class="fas fa-cog"></i> Book Configuration</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Book Type</label>
+            <select id="bookType" class="form-select">
+              <option value="novel">Novel / Fiction</option>
+              <option value="nonfiction">Non-Fiction / Education</option>
+              <option value="health">Health &amp; Wellness</option>
+              <option value="poetry">Poetry</option>
+              <option value="children-coloring">Coloring Book — Children</option>
+              <option value="adult-coloring">Coloring Book — Adults</option>
+              <option value="mandala">Mandalas</option>
+              <option value="picture-book">Picture Book</option>
+              <option value="cookbook">Cookbook / Recipes</option>
+              <option value="journal">Journal / Planner</option>
+              <option value="magazine">Magazine</option>
+              <option value="activity">Activity Book</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">KDP Trim Size</label>
+            <select id="bookSize" class="form-select">
+              <option value="5x8">5" x 8"</option>
+              <option value="5.25x8">5.25" x 8"</option>
+              <option value="5.5x8.5">5.5" x 8.5"</option>
+              <option value="6x9" selected>6" x 9"</option>
+              <option value="6.14x9.21">6.14" x 9.21"</option>
+              <option value="6.69x9.61">6.69" x 9.61"</option>
+              <option value="7x10">7" x 10"</option>
+              <option value="7.44x9.69">7.44" x 9.69"</option>
+              <option value="7.5x9.25">7.5" x 9.25"</option>
+              <option value="8x10">8" x 10"</option>
+              <option value="8.25x6">8.25" x 6" (Landscape)</option>
+              <option value="8.25x8.25">8.25" x 8.25" (Square)</option>
+              <option value="8.5x8.5">8.5" x 8.5" (Square)</option>
+              <option value="8.5x11">8.5" x 11"</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Number of Pages</label>
+            <input type="number" id="bookPages" class="form-input" value="50" min="24" max="1500">
+            <div class="form-hint">Minimum 24, maximum 1,500 pages</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Paper Type</label>
+            <select id="bookPaper" class="form-select">
+              <option value="white">White Paper</option>
+              <option value="cream">Cream Paper</option>
+            </select>
+          </div>
+          <div class="form-group full">
+            <label class="form-label">Prompt / Book Description</label>
+            <textarea id="bookPrompt" class="form-textarea" rows="4" placeholder="Describe the book you want to create. E.g.: A jungle animals coloring book for kids ages 4-8 with simple illustrations and large coloring areas..."></textarea>
+          </div>
+          <div class="form-group full">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="bookBleed" checked>
+              <span class="form-label" style="margin:0">Add Bleed (0.125" — recommended for image books)</span>
+            </label>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" id="btnGenerateBook" onclick="startBookGeneration()">
+            <i class="fas fa-wand-magic-sparkles"></i> Generate Book
+          </button>
+          <button class="btn btn-danger hidden" id="btnCancelBook" onclick="cancelBookGeneration()">
+            <i class="fas fa-stop"></i> Stop
+          </button>
+        </div>
+      </div>
+      <div id="bookProgress" class="progress-container hidden">
+        <div class="progress-bar-wrap"><div class="progress-bar" id="bookProgressBar"></div></div>
+        <div class="progress-text">
+          <span class="progress-status"><span class="spinner"></span> <span id="bookProgressLabel">Generating...</span></span>
+          <span id="bookProgressPercent">0%</span>
+        </div>
+      </div>
+      <div id="bookPreview" class="preview-section hidden">
+        <div class="preview-header">
+          <h3><i class="fas fa-eye accent"></i> Preview</h3>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary btn-sm" onclick="previewBookPDF()"><i class="fas fa-eye"></i> View PDF</button>
+            <button class="btn btn-primary btn-sm" onclick="downloadBookPDF()"><i class="fas fa-download"></i> Download PDF</button>
+          </div>
+        </div>
+        <div id="bookPreviewContent" class="preview-container"></div>
+      </div>
+    </div>
+
+    <!-- Cover Generator -->
+    <div id="view-cover" class="panel">
+      <div class="panel-header">
+        <button class="back-btn" onclick="navigate('dashboard')"><i class="fas fa-arrow-left"></i></button>
+        <h2><i class="fas fa-palette accent"></i> Cover Generator</h2>
+      </div>
+      <div class="section-card">
+        <h3><i class="fas fa-cog"></i> Cover Configuration</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Book Trim Size</label>
+            <select id="coverSize" class="form-select">
+              <option value="5x8">5" x 8"</option>
+              <option value="5.5x8.5">5.5" x 8.5"</option>
+              <option value="6x9" selected>6" x 9"</option>
+              <option value="6.14x9.21">6.14" x 9.21"</option>
+              <option value="6.69x9.61">6.69" x 9.61"</option>
+              <option value="7x10">7" x 10"</option>
+              <option value="8x10">8" x 10"</option>
+              <option value="8.25x8.25">8.25" x 8.25"</option>
+              <option value="8.5x8.5">8.5" x 8.5"</option>
+              <option value="8.5x11">8.5" x 11"</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Page Count (for spine calculation)</label>
+            <input type="number" id="coverPages" class="form-input" value="100" min="24" max="1500">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Paper Type</label>
+            <select id="coverPaper" class="form-select">
+              <option value="white">White Paper</option>
+              <option value="cream">Cream Paper</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Spine Color</label>
+            <input type="color" id="coverSpineColor" class="form-input" value="#1a1a2c" style="height:44px;padding:4px 8px;cursor:pointer">
+          </div>
+          <div class="form-group full">
+            <label class="form-label">Front Cover Prompt</label>
+            <textarea id="coverPrompt" class="form-textarea" rows="3" placeholder="Describe the front cover. E.g.: Professional fantasy novel cover with a magical castle in the clouds..."></textarea>
+          </div>
+          <div class="form-group full">
+            <label class="form-label">Spine Text (optional)</label>
+            <input type="text" id="coverSpineText" class="form-input" placeholder="E.g.: Book Title — Author Name">
+          </div>
+          <div class="form-group full">
+            <label class="form-label">Back Cover Prompt (optional)</label>
+            <textarea id="coverBackPrompt" class="form-textarea" rows="2" placeholder="Describe the back cover or leave blank for a complementary design..."></textarea>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" id="btnGenerateCover" onclick="startCoverGeneration()">
+            <i class="fas fa-wand-magic-sparkles"></i> Generate Cover
+          </button>
+        </div>
+      </div>
+      <div id="coverProgress" class="progress-container hidden">
+        <div class="progress-bar-wrap"><div class="progress-bar" id="coverProgressBar"></div></div>
+        <div class="progress-text">
+          <span class="progress-status"><span class="spinner"></span> <span id="coverProgressLabel">Generating...</span></span>
+          <span id="coverProgressPercent">0%</span>
+        </div>
+      </div>
+      <div id="coverPreview" class="preview-section hidden">
+        <div class="preview-header">
+          <h3><i class="fas fa-eye accent"></i> Cover Preview</h3>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" onclick="downloadCoverPDF()"><i class="fas fa-download"></i> Download KDP PDF</button>
+          </div>
+        </div>
+        <div id="coverPreviewContent" class="cover-preview-wrap"></div>
+      </div>
+    </div>
+
+    <!-- Keyword Research -->
+    <div id="view-keywords" class="panel">
+      <div class="panel-header">
+        <button class="back-btn" onclick="navigate('dashboard')"><i class="fas fa-arrow-left"></i></button>
+        <h2><i class="fas fa-magnifying-glass accent"></i> Amazon Keywords</h2>
+      </div>
+      <div class="section-card">
+        <h3><i class="fas fa-book"></i> Book Details</h3>
+        <div class="form-group">
+          <label class="form-label">Book Title</label>
+          <input type="text" id="kwTitle" class="form-input" placeholder="E.g.: Adult Mandala Coloring Book for Relaxation">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category / Niche (optional)</label>
+          <input type="text" id="kwCategory" class="form-input" placeholder="E.g.: Coloring, Relaxation, Mindfulness">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Language (for keywords)</label>
+          <select id="kwLang" class="form-select">
+            <option value="en" selected>English (Amazon.com)</option>
+            <option value="de">German (Amazon.de)</option>
+            <option value="fr">French (Amazon.fr)</option>
+            <option value="es">Spanish (Amazon.es)</option>
+            <option value="it">Italian (Amazon.it)</option>
+            <option value="ro">Romanian</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="btnGenerateKw" onclick="startKeywordResearch()">
+          <i class="fas fa-magnifying-glass"></i> Generate Keywords
+        </button>
+      </div>
+      <div id="kwProgress" class="progress-container hidden">
+        <div class="progress-bar-wrap"><div class="progress-bar" id="kwProgressBar" style="width:100%;animation:pulse 1.5s infinite"></div></div>
+        <div class="progress-text">
+          <span class="progress-status"><span class="spinner"></span> <span id="kwProgressLabel">Analyzing...</span></span>
+        </div>
+      </div>
+      <div id="kwResults" class="keyword-results hidden"></div>
+    </div>
+
+    <!-- Pricing -->
+    <div id="view-pricing" class="panel">
+      <div class="panel-header">
+        <button class="back-btn" onclick="navigate('dashboard')"><i class="fas fa-arrow-left"></i></button>
+        <h2><i class="fas fa-crown accent"></i> Subscription Plans</h2>
+      </div>
+      <div style="text-align:center;margin-bottom:8px">
+        <p style="color:var(--text-secondary);font-size:1rem;max-width:560px;margin:0 auto">Choose the plan that fits your publishing needs. All plans include full access to Book Generator, Cover Generator, and Keyword Research.</p>
+      </div>
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <h3>Basic</h3>
+          <p class="pricing-desc">Perfect for getting started with KDP publishing</p>
+          <div class="pricing-price">
+            <span class="amount">$29</span><span class="period"> / month</span>
+          </div>
+          <ul class="pricing-features">
+            <li><i class="fas fa-check"></i> Book generation (up to 100 pages)</li>
+            <li><i class="fas fa-check"></i> 10 books per month</li>
+            <li><i class="fas fa-check"></i> Cover generation (front &amp; back)</li>
+            <li><i class="fas fa-check"></i> Keyword research tool</li>
+            <li><i class="fas fa-check"></i> KDP-ready PDF export</li>
+            <li><i class="fas fa-check"></i> All KDP trim sizes</li>
+          </ul>
+          <a id="stripeLinkBasic" href="https://buy.stripe.com/28E14ngBu9vIeodf3L4Vy05" target="_blank" rel="noopener noreferrer" class="pricing-btn pricing-btn-outline">
+            <i class="fas fa-rocket"></i> Get Basic
+          </a>
+        </div>
+        <div class="pricing-card featured">
+          <div class="pricing-badge">Most Popular</div>
+          <h3>Pro</h3>
+          <p class="pricing-desc">For serious KDP publishers who need more power</p>
+          <div class="pricing-price">
+            <span class="amount">$49</span><span class="period"> / month</span>
+          </div>
+          <ul class="pricing-features">
+            <li><i class="fas fa-check"></i> <strong>Unlimited</strong> pages per book</li>
+            <li><i class="fas fa-check"></i> <strong>Unlimited</strong> books per month</li>
+            <li><i class="fas fa-check"></i> Cover with spine text &amp; custom font</li>
+            <li><i class="fas fa-check"></i> Advanced keyword research</li>
+            <li><i class="fas fa-check"></i> Priority generation speed</li>
+            <li><i class="fas fa-check"></i> All book types including mandalas</li>
+            <li><i class="fas fa-check"></i> Books up to 1,500 pages</li>
+          </ul>
+          <a id="stripeLinkPro" href="https://buy.stripe.com/aFa8wP0CwgYa1Br08R4Vy03" target="_blank" rel="noopener noreferrer" class="pricing-btn pricing-btn-primary">
+            <i class="fas fa-crown"></i> Get Pro
+          </a>
+        </div>
+        <div class="pricing-card">
+          <h3>Pro Annual</h3>
+          <p class="pricing-desc">Best value — save big with annual billing</p>
+          <div class="pricing-price">
+            <span class="amount">$249</span><span class="period"> / year</span>
+            <br><span class="save-tag"><i class="fas fa-tag"></i> Save $339/year vs monthly</span>
+          </div>
+          <ul class="pricing-features">
+            <li><i class="fas fa-check"></i> Everything in <strong>Pro</strong></li>
+            <li><i class="fas fa-check"></i> <strong>Unlimited</strong> pages &amp; books</li>
+            <li><i class="fas fa-check"></i> Cover with spine text &amp; custom font</li>
+            <li><i class="fas fa-check"></i> Advanced keyword research</li>
+            <li><i class="fas fa-check"></i> Priority generation speed</li>
+            <li><i class="fas fa-check"></i> Priority email support</li>
+            <li><i class="fas fa-check"></i> Billed annually at $249</li>
+          </ul>
+          <a id="stripeLinkAnnual" href="https://buy.stripe.com/4gM28r70UbDQ7ZP7Bj4Vy04" target="_blank" rel="noopener noreferrer" class="pricing-btn pricing-btn-outline">
+            <i class="fas fa-star"></i> Get Pro Annual
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Panel -->
+    <div id="view-admin" class="panel">
+      <div class="panel-header">
+        <button class="back-btn" onclick="navigate('dashboard')"><i class="fas fa-arrow-left"></i></button>
+        <h2><i class="fas fa-shield accent"></i> Admin Panel</h2>
+      </div>
+      <div class="section-card">
+        <h3><i class="fas fa-users"></i> Registered Users</h3>
+        <div style="overflow-x:auto">
+          <table class="admin-table" id="adminUsersTable">
+            <thead><tr><th>Email</th><th>Name</th><th>Subscription</th><th>Joined</th><th>Actions</th></tr></thead>
+            <tbody id="adminUsersBody"></tbody>
+          </table>
+        </div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:16px" onclick="loadAdminUsers()"><i class="fas fa-refresh"></i> Refresh</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+</div>
+
+<script>
+/* =============================================
+   KDP BOOK MAKER — Standalone Application
+   ============================================= */
+
+// --- Light Mode Detection ---
+if (window.matchMedia && !window.matchMedia('(prefers-color-scheme: dark)').matches) {
+  document.documentElement.classList.add('light');
+}
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(event) {
+  if (event.matches) {
+    document.documentElement.classList.remove('light');
+  } else {
+    document.documentElement.classList.add('light');
+  }
+});
+
+// --- Config ---
+var KDP_SIZES = {
+  '5x8':{w:5,h:8},'5.25x8':{w:5.25,h:8},'5.5x8.5':{w:5.5,h:8.5},
+  '6x9':{w:6,h:9},'6.14x9.21':{w:6.14,h:9.21},'6.69x9.61':{w:6.69,h:9.61},
+  '7x10':{w:7,h:10},'7.44x9.69':{w:7.44,h:9.69},'7.5x9.25':{w:7.5,h:9.25},
+  '8x10':{w:8,h:10},'8.25x6':{w:8.25,h:6},'8.25x8.25':{w:8.25,h:8.25},
+  '8.5x8.5':{w:8.5,h:8.5},'8.5x11':{w:8.5,h:11}
+};
+var BLEED = 0.125;
+var IMAGE_TYPES = ['children-coloring','adult-coloring','picture-book','activity'];
+var MANDALA_TYPE = 'mandala';
+var JOURNAL_TYPE = 'journal';
+
+// --- Auth State ---
+var authToken = null;
+var currentUser = null;
+
+// --- Generation State ---
+var bookGenerationState = { active:false, cancelled:false, content:[], outline:null, images:[] };
+var coverGenerationState = { active:false, frontImg:null, backImg:null };
+var generatedBookPdfData = null;
+var generatedCoverPdfData = null;
+
+// ================================
+// AUTH
+// ================================
+function getAuthHeaders() {
+  var headers = { 'Content-Type': 'application/json' };
+  if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+  return headers;
+}
+
+function updateAuthUI() {
+  var badge = document.getElementById('userBadge');
+  var loginBtn = document.getElementById('loginBtn');
+  var adminNav = document.getElementById('navAdmin');
+  if (currentUser) {
+    badge.classList.remove('hidden');
+    loginBtn.classList.add('hidden');
+    document.getElementById('userEmail').textContent = currentUser.email;
+    var tag = document.getElementById('userSubTag');
+    tag.textContent = (currentUser.subscription || 'free').toUpperCase();
+    tag.className = 'sub-tag' + (currentUser.subscription === 'free' ? ' free' : '');
+    if (currentUser.role === 'admin') adminNav.classList.remove('hidden');
+    else adminNav.classList.add('hidden');
+    // Prefill Stripe links with email
+    var email = encodeURIComponent(currentUser.email);
+    var basicLink = document.getElementById('stripeLinkBasic');
+    var proLink = document.getElementById('stripeLinkPro');
+    var annualLink = document.getElementById('stripeLinkAnnual');
+    if (basicLink) basicLink.href = 'https://buy.stripe.com/28E14ngBu9vIeodf3L4Vy05?prefilled_email=' + email;
+    if (proLink) proLink.href = 'https://buy.stripe.com/aFa8wP0CwgYa1Br08R4Vy03?prefilled_email=' + email;
+    if (annualLink) annualLink.href = 'https://buy.stripe.com/4gM28r70UbDQ7ZP7Bj4Vy04?prefilled_email=' + email;
+  } else {
+    badge.classList.add('hidden');
+    loginBtn.classList.remove('hidden');
+    adminNav.classList.add('hidden');
+  }
+}
+
+function showAuthModal(mode) {
+  var isLogin = mode === 'login';
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML =
+    '<div class="modal-box">' +
+    '<h3>' + (isLogin ? 'Welcome Back' : 'Create Account') + '</h3>' +
+    '<p>' + (isLogin ? 'Login to access all features' : 'Register to start creating books') + '</p>' +
+    '<div id="authError" class="auth-error hidden"></div>' +
+    '<div class="auth-form">' +
+    (isLogin ? '' : '<div class="form-group"><label class="form-label">Name</label><input type="text" id="authName" class="form-input" placeholder="Your name"></div>') +
+    '<div class="form-group"><label class="form-label">Email</label><input type="email" id="authEmail" class="form-input" placeholder="your@email.com"></div>' +
+    '<div class="form-group"><label class="form-label">Password</label><input type="password" id="authPassword" class="form-input" placeholder="' + (isLogin ? 'Your password' : 'Min 6 characters') + '"></div>' +
+    '</div>' +
+    '<div class="modal-actions">' +
+    '<button class="btn btn-secondary btn-sm" id="authCancelBtn">Cancel</button>' +
+    '<button class="btn btn-primary btn-sm" id="authSubmitBtn"><i class="fas ' + (isLogin ? 'fa-sign-in-alt' : 'fa-user-plus') + '"></i> ' + (isLogin ? 'Login' : 'Register') + '</button>' +
+    '</div>' +
+    '<div class="auth-toggle">' + (isLogin ? 'No account? <a id="authToggle">Register here</a>' : 'Already have an account? <a id="authToggle">Login here</a>') + '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#authCancelBtn').addEventListener('click', function() { overlay.remove(); });
+  overlay.querySelector('#authToggle').addEventListener('click', function() { overlay.remove(); showAuthModal(isLogin ? 'register' : 'login'); });
+  overlay.querySelector('#authSubmitBtn').addEventListener('click', function() { doAuth(isLogin, overlay); });
+  // Enter key
+  overlay.querySelectorAll('input').forEach(function(inp) {
+    inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') doAuth(isLogin, overlay); });
+  });
+  setTimeout(function() { overlay.querySelector('#authEmail').focus(); }, 100);
+}
+
+async function doAuth(isLogin, overlay) {
+  var email = overlay.querySelector('#authEmail').value.trim();
+  var password = overlay.querySelector('#authPassword').value;
+  var name = isLogin ? '' : (overlay.querySelector('#authName') ? overlay.querySelector('#authName').value.trim() : '');
+  var errorEl = overlay.querySelector('#authError');
+  var submitBtn = overlay.querySelector('#authSubmitBtn');
+  if (!email || !password) { errorEl.textContent = 'Please fill in all fields'; errorEl.classList.remove('hidden'); return; }
+  submitBtn.disabled = true; submitBtn.innerHTML = '<span class="spinner"></span> Please wait...';
+  try {
+    var endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+    var body = isLogin ? { email: email, password: password } : { email: email, password: password, name: name };
+    var res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Authentication failed');
+    authToken = data.token;
+    currentUser = data.user;
+    updateAuthUI();
+    overlay.remove();
+    showToast('Welcome, ' + (currentUser.name || currentUser.email) + '!', 'success');
+  } catch (err) {
+    errorEl.textContent = err.message; errorEl.classList.remove('hidden');
+    submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas ' + (isLogin ? 'fa-sign-in-alt' : 'fa-user-plus') + '"></i> ' + (isLogin ? 'Login' : 'Register');
+  }
+}
+
+function logout() {
+  authToken = null;
+  currentUser = null;
+  updateAuthUI();
+  navigate('dashboard');
+  showToast('Logged out successfully.', 'info');
+}
+
+function requireAuth() {
+  if (!authToken || !currentUser) {
+    showToast('Please login or register first.', 'error');
+    showAuthModal('login');
+    return false;
+  }
+  return true;
+}
+
+// ================================
+// NAVIGATION
+// ================================
+function navigate(view) {
+  document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+  var el = document.getElementById('view-' + view);
+  if (el) el.classList.add('active');
+  document.querySelectorAll('.nav-btn[data-view]').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.view === view);
+  });
+  if (view === 'admin' && currentUser && currentUser.role === 'admin') loadAdminUsers();
+}
+
+// ================================
+// TOAST
+// ================================
+function showToast(message, type) {
+  type = type || 'success';
+  var container = document.getElementById('toastContainer');
+  var toast = document.createElement('div');
+  toast.className = 'toast ' + type;
+  var icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+  toast.innerHTML = '<i class="fas ' + icon + '"></i> ' + message;
+  container.appendChild(toast);
+  setTimeout(function() { toast.style.opacity = '0'; toast.style.transform = 'translateX(40px)';
+    setTimeout(function() { if (toast.parentNode) toast.remove(); }, 300);
+  }, 3500);
+}
+
+// ================================
+// KDP UTILS
+// ================================
+function getSize(k) { return KDP_SIZES[k] || KDP_SIZES['6x9']; }
+function calcSpineWidth(pages, paper) { return pages * (paper === 'cream' ? 0.0025 : 0.002252); }
+function calcMargins(pages) {
+  if (pages < 150) return {inside:0.375,outside:0.25,top:0.25,bottom:0.25};
+  if (pages < 400) return {inside:0.75,outside:0.375,top:0.25,bottom:0.25};
+  if (pages < 600) return {inside:0.875,outside:0.5,top:0.25,bottom:0.25};
+  return {inside:1.0,outside:0.5,top:0.25,bottom:0.25};
+}
+
+// ================================
+// API CALLS (to our backend)
+// ================================
+async function apiGenerateText(prompt, maxTokens) {
+  var res = await fetch('/api/generate/text', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ prompt: prompt, maxTokens: maxTokens || 4096 })
+  });
+  if (res.status === 401) { logout(); throw new Error('Session expired. Please login again.'); }
+  if (res.status === 403) { navigate('pricing'); throw new Error('Active subscription required. Please choose a plan.'); }
+  var data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Generation failed');
+  return data.content;
+}
+
+async function apiGenerateTextStream(prompt, onChunk, maxTokens) {
+  var res = await fetch('/api/generate/text-stream', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ prompt: prompt, maxTokens: maxTokens || 4096 })
+  });
+  if (res.status === 401) { logout(); throw new Error('Session expired.'); }
+  if (res.status === 403) { navigate('pricing'); throw new Error('Subscription required.'); }
+  if (!res.ok) {
+    var errData = await res.json().catch(function() { return {}; });
+    throw new Error(errData.error || 'Stream failed');
+  }
+  var reader = res.body.getReader();
+  var decoder = new TextDecoder();
+  var buffer = '';
+  var fullText = '';
+  while (true) {
+    var result = await reader.read();
+    if (result.done) break;
+    buffer += decoder.decode(result.value, { stream: true });
+    var lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (line.startsWith('data: ')) {
+        try {
+          var ev = JSON.parse(line.slice(6));
+          if (ev.error) throw new Error(ev.error);
+          if (ev.done) { fullText = ev.text || fullText; }
+          else if (ev.partial) { fullText = ev.partial; if (onChunk) onChunk(fullText, false); }
+        } catch (_) { /* skip */ }
+      }
+    }
+  }
+  if (onChunk) onChunk(fullText, true);
+  return fullText;
+}
+
+async function apiGenerateImage(prompt, size) {
+  var res = await fetch('/api/generate/image', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ prompt: prompt, size: size || 'square' })
+  });
+  if (res.status === 401) { logout(); throw new Error('Session expired.'); }
+  if (res.status === 403) { navigate('pricing'); throw new Error('Subscription required.'); }
+  var data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Image generation failed');
+  return data.urls || [];
+}
+
+async function fetchImageAsBase64(url) {
+  // Use proxy to avoid CORS issues with DALL-E URLs
+  var proxyUrl = '/api/proxy-image?url=' + encodeURIComponent(url);
+  var res = await fetch(proxyUrl, { headers: getAuthHeaders() });
+  var blob = await res.blob();
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onloadend = function() { resolve(reader.result); };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// ================================
+// SEEDED RNG + MANDALA
+// ================================
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function generateMandalaImage(size, seed) {
+  var canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  var ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, size, size);
+  var cx = size/2, cy = size/2, maxR = size*0.44;
+  var rng = mulberry32(seed);
+  var symmetry = [6,8,10,12,16][Math.floor(rng()*5)];
+  var layers = 4 + Math.floor(rng()*5);
+  ctx.strokeStyle = '#000000'; ctx.fillStyle = '#000000';
+  ctx.lineWidth = Math.max(1.5, size/500); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(cx,cy,maxR+size*0.02,0,Math.PI*2); ctx.stroke();
+  for (var l=0;l<layers;l++) {
+    var innerR=maxR*(l/layers),outerR=maxR*((l+1)/layers),midR=(innerR+outerR)/2;
+    var pt = Math.floor(rng()*7);
+    ctx.beginPath(); ctx.arc(cx,cy,outerR,0,Math.PI*2); ctx.stroke();
+    for (var i=0;i<symmetry;i++) {
+      var angle=(2*Math.PI*i)/symmetry;
+      ctx.save(); ctx.translate(cx,cy); ctx.rotate(angle);
+      switch(pt) {
+        case 0: var pw=(outerR-innerR)*(0.3+rng()*0.3); ctx.beginPath(); ctx.moveTo(0,-innerR); ctx.bezierCurveTo(pw,-(innerR+(outerR-innerR)*0.3),pw,-(outerR-(outerR-innerR)*0.3),0,-outerR); ctx.bezierCurveTo(-pw,-(outerR-(outerR-innerR)*0.3),-pw,-(innerR+(outerR-innerR)*0.3),0,-innerR); ctx.stroke(); break;
+        case 1: ctx.beginPath(); ctx.moveTo(0,-innerR-2); ctx.quadraticCurveTo((outerR-innerR)*0.4,-midR,0,-outerR+2); ctx.quadraticCurveTo(-(outerR-innerR)*0.4,-midR,0,-innerR-2); ctx.stroke(); var dotR=(outerR-innerR)*0.08; ctx.beginPath(); ctx.arc(0,-midR,dotR,0,Math.PI*2); ctx.fill(); break;
+        case 2: var cr=(outerR-innerR)*0.25; ctx.beginPath(); ctx.arc(0,-midR,cr,0,Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(0,-midR,cr*0.4,0,Math.PI*2); ctx.fill(); break;
+        case 3: var dw2=Math.PI/symmetry*midR*0.6; ctx.beginPath(); ctx.moveTo(0,-innerR-2); ctx.lineTo(dw2,-midR); ctx.lineTo(0,-outerR+2); ctx.lineTo(-dw2,-midR); ctx.closePath(); ctx.stroke(); break;
+        case 4: ctx.beginPath(); ctx.moveTo(0,-innerR); var wA=(outerR-innerR)*0.3; ctx.bezierCurveTo(wA,-innerR-(outerR-innerR)*0.25,-wA,-outerR+(outerR-innerR)*0.25,0,-outerR); ctx.stroke(); break;
+        case 5: var tipR=outerR,baseR=innerR+(outerR-innerR)*0.3,hA=Math.PI/symmetry*0.4; ctx.beginPath(); ctx.moveTo(0,-tipR); ctx.lineTo(Math.sin(hA)*baseR,-Math.cos(hA)*baseR); ctx.lineTo(0,-innerR); ctx.lineTo(-Math.sin(hA)*baseR,-Math.cos(hA)*baseR); ctx.closePath(); ctx.stroke(); break;
+        case 6: var aS=-Math.PI/2-Math.PI/symmetry*0.5,aE=-Math.PI/2+Math.PI/symmetry*0.5; ctx.beginPath(); ctx.arc(0,0,midR,aS,aE); ctx.stroke(); ctx.beginPath(); ctx.arc(0,-midR,(outerR-innerR)*0.06,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(0,-(midR+(outerR-midR)*0.5),(outerR-innerR)*0.04,0,Math.PI*2); ctx.fill(); break;
+      }
+      ctx.restore();
+    }
+  }
+  var cR=maxR*0.1;
+  for (var j=0;j<symmetry;j++) { var a2=(2*Math.PI*j)/symmetry; ctx.save(); ctx.translate(cx,cy); ctx.rotate(a2); ctx.beginPath(); ctx.moveTo(0,0); ctx.bezierCurveTo(cR*0.5,-cR*0.3,cR*0.5,-cR*0.7,0,-cR); ctx.bezierCurveTo(-cR*0.5,-cR*0.7,-cR*0.5,-cR*0.3,0,0); ctx.stroke(); ctx.restore(); }
+  ctx.beginPath(); ctx.arc(cx,cy,cR*0.25,0,Math.PI*2); ctx.fill();
+  return canvas.toDataURL('image/png');
+}
+
+// ================================
+// PROGRESS
+// ================================
+function setProgress(barId, labelId, percentId, pct, label) {
+  var bar = document.getElementById(barId);
+  var lbl = document.getElementById(labelId);
+  var pctEl = document.getElementById(percentId);
+  if (bar) bar.style.width = Math.min(100,Math.max(0,pct)) + '%';
+  if (lbl) lbl.textContent = label || '';
+  if (pctEl) pctEl.textContent = Math.round(pct) + '%';
+}
+
+// ================================
+// BOOK GENERATION
+// ================================
+function startBookGeneration() {
+  if (!requireAuth()) return;
+  var type = document.getElementById('bookType').value;
+  var sizeKey = document.getElementById('bookSize').value;
+  var pages = parseInt(document.getElementById('bookPages').value) || 50;
+  var paper = document.getElementById('bookPaper').value;
+  var prompt = document.getElementById('bookPrompt').value.trim();
+  var useBleed = document.getElementById('bookBleed').checked;
+  if (!prompt) { showToast('Please enter a book description.','error'); return; }
+  if (pages < 24) { showToast('Minimum page count is 24.','error'); return; }
+  if (pages > 1500) { showToast('Maximum page count is 1,500.','error'); return; }
+  var size = getSize(sizeKey);
+  bookGenerationState = { active:true, cancelled:false, content:[], outline:null, images:[], type:type, size:size, pages:pages, paper:paper, prompt:prompt, useBleed:useBleed };
+  document.getElementById('btnGenerateBook').disabled = true;
+  document.getElementById('btnCancelBook').classList.remove('hidden');
+  document.getElementById('bookProgress').classList.remove('hidden');
+  document.getElementById('bookPreview').classList.add('hidden');
+  generatedBookPdfData = null;
+  if (type === MANDALA_TYPE) generateMandalaBook();
+  else if (IMAGE_TYPES.indexOf(type) >= 0) generateImageBook();
+  else if (type === JOURNAL_TYPE) generateJournalBook();
+  else generateTextBook();
+}
+
+function cancelBookGeneration() {
+  bookGenerationState.cancelled = true; bookGenerationState.active = false;
+  finishBookGeneration(); showToast('Generation stopped.','error');
+}
+
+function finishBookGeneration() {
+  document.getElementById('btnGenerateBook').disabled = false;
+  document.getElementById('btnCancelBook').classList.add('hidden');
+}
+
+// -- Mandala Book (programmatic, no API) --
+function generateMandalaBook() {
+  var s = bookGenerationState, totalPages = s.pages, imgSize = 2400;
+  setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',0,'Generating mandalas...');
+  s.images = []; var batchSize = 5, idx = 0;
+  function processBatch() {
+    if (s.cancelled || idx >= totalPages) { onDone(); return; }
+    var end = Math.min(idx+batchSize, totalPages);
+    for (var i=idx; i<end; i++) {
+      s.images.push(generateMandalaImage(imgSize, i*7919+42+Math.floor(s.prompt.length*31)));
+    }
+    idx = end;
+    setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',(idx/totalPages)*90,'Mandalas: '+idx+' / '+totalPages);
+    setTimeout(processBatch, 10);
+  }
+  processBatch();
+  function onDone() {
+    if (s.cancelled) return;
+    setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',95,'Creating PDF...');
+    setTimeout(function() {
+      try { buildImageBookPDF(); setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',100,'Done!');
+        showBookPreviewImages(); finishBookGeneration(); showToast('Mandala book generated!');
+      } catch (e) { showToast('PDF error: '+e.message,'error'); finishBookGeneration(); }
+    }, 50);
+  }
+}
+
+// -- Image Book (API calls) --
+async function generateImageBook() {
+  var s = bookGenerationState, totalPages = s.pages;
+  var typeName = s.type === 'children-coloring' ? 'coloring page for children, simple outlines, large areas' :
+    s.type === 'adult-coloring' ? 'detailed coloring page for adults, intricate patterns' :
+    s.type === 'picture-book' ? 'colorful children book illustration' : 'activity page illustration';
+  setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',2,'Preparing image generation...');
+  s.images = []; var generated = 0;
+  var isColoring = (s.type === 'children-coloring' || s.type === 'adult-coloring');
+  var sizeKey = s.size.w >= s.size.h ? 'landscape' : 'portrait';
+  if (Math.abs(s.size.w - s.size.h) < 0.5) sizeKey = 'square';
+  try {
+    while (generated < totalPages && !s.cancelled) {
+      var imgPrompt = isColoring ?
+        'Black and white line art ' + typeName + ', ' + s.prompt + ', clean outlines only, no shading, no color, white background, high detail' :
+        typeName + ', ' + s.prompt + ', high quality illustration, vibrant colors';
+      setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',5+(generated/totalPages)*85,'Generating images: '+generated+' / '+totalPages);
+      try {
+        var urls = await apiGenerateImage(imgPrompt, sizeKey);
+        if (urls.length > 0) {
+          var b64 = await fetchImageAsBase64(urls[0]);
+          s.images.push(b64); generated++;
+        }
+      } catch (err) {
+        // Fallback to mandala if image gen fails
+        s.images.push(generateMandalaImage(2400, generated*1337));
+        generated++;
+      }
+    }
+  } catch (e) { if (!s.cancelled) showToast('Error: '+e.message,'error'); }
+  if (s.cancelled && s.images.length === 0) { finishBookGeneration(); return; }
+  setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',95,'Creating PDF...');
+  setTimeout(function() {
+    try { buildImageBookPDF(); setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',100,'Done!');
+      showBookPreviewImages(); finishBookGeneration(); showToast('Book generated! ('+s.images.length+' pages)');
+    } catch (e) { showToast('PDF error: '+e.message,'error'); finishBookGeneration(); }
+  }, 50);
+}
+
+// -- Text Book --
+async function generateTextBook() {
+  var s = bookGenerationState;
+  setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',2,'Generating book outline...');
+  var wordsPerPage = 250, totalWords = s.pages * wordsPerPage;
+  var typeName = {'novel':'fiction novel','nonfiction':'educational non-fiction book','health':'health and wellness book',
+    'poetry':'poetry collection','cookbook':'cookbook with detailed recipes','magazine':'magazine','other':'book'}[s.type] || 'book';
+  var outlinePrompt = 'You are a professional author. Create a detailed outline for a '+typeName+' about: "'+s.prompt+'". The book should be approximately '+s.pages+' pages (~'+totalWords+' words total). Return ONLY valid JSON: {"title":"...","chapters":[{"title":"...","description":"...","targetWords":N}]}. Each chapter targetWords should be proportional. No extra text, just JSON.';
+  try {
+    var outlineText = await apiGenerateText(outlinePrompt, 4096);
+    var jsonMatch = outlineText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Could not generate book structure');
+    s.outline = JSON.parse(jsonMatch[0]);
+    if (!s.outline.chapters || !s.outline.chapters.length) throw new Error('Invalid structure');
+  } catch (e) { showToast('Outline error: '+e.message,'error'); finishBookGeneration(); return; }
+  if (s.cancelled) { finishBookGeneration(); return; }
+  s.content = []; var summaries = [], chapters = s.outline.chapters;
+  for (var c=0; c<chapters.length; c++) {
+    if (s.cancelled) break;
+    var ch = chapters[c];
+    setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',10+((c/chapters.length)*80),'Writing chapter '+(c+1)+'/'+chapters.length+': '+ch.title);
+    var ctx = summaries.length > 0 ? 'Previous chapters summary: ' + summaries.join(' | ') : '';
+    var chPrompt = 'You are a professional author writing a '+typeName+' titled "'+s.outline.title+'". '+ctx+'\n\nWrite chapter '+(c+1)+' titled "'+ch.title+'". Description: '+ch.description+'. Write approximately '+(ch.targetWords||2000)+' words. Write complete, engaging, professional content. Start directly with the chapter content.';
+    try {
+      var chapterText = await apiGenerateTextStream(chPrompt, function() {}, 8000);
+      s.content.push({ title: ch.title, text: chapterText });
+      summaries.push(ch.title+': '+chapterText.substring(0,150).replace(/\n/g,' '));
+      if (summaries.length > 5) summaries = summaries.slice(-5);
+    } catch (e) { s.content.push({ title: ch.title, text: '[Error: '+e.message+']' }); }
+  }
+  if (s.cancelled && s.content.length === 0) { finishBookGeneration(); return; }
+  setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',95,'Creating PDF...');
+  setTimeout(function() {
+    try { buildTextBookPDF(); setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',100,'Done!');
+      showBookPreviewText(); finishBookGeneration(); showToast('Book "'+s.outline.title+'" generated!');
+    } catch (e) { showToast('PDF error: '+e.message,'error'); finishBookGeneration(); }
+  }, 50);
+}
+
+// -- Journal (no API) --
+function generateJournalBook() {
+  var s = bookGenerationState;
+  setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',20,'Generating journal pages...');
+  var JPdf = window.jspdf.jsPDF, size = s.size;
+  var bleed = s.useBleed ? BLEED : 0, pageW = size.w+2*bleed, pageH = size.h+2*bleed;
+  var margins = calcMargins(s.pages);
+  var doc = new JPdf({ unit:'in', format:[pageW,pageH] });
+  var textX = bleed+margins.outside, textW = size.w-margins.outside-margins.inside;
+  for (var p=0; p<s.pages; p++) {
+    if (p>0) doc.addPage([pageW,pageH]);
+    doc.setDrawColor(200,200,200); doc.setLineWidth(0.005);
+    var y = bleed+margins.top+0.5;
+    while (y < bleed+size.h-margins.bottom) { doc.line(textX,y,textX+textW,y); y+=0.35; }
+    doc.setFont('Helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,180,180);
+    doc.text('Date: ________________', textX, bleed+margins.top+0.2);
+    doc.text(String(p+1), bleed+size.w/2, bleed+size.h-margins.bottom+0.15, {align:'center'});
+    setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',20+(p/s.pages)*70,'Pages: '+(p+1)+' / '+s.pages);
+  }
+  generatedBookPdfData = doc.output('blob');
+  setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',100,'Done!');
+  document.getElementById('bookPreview').classList.remove('hidden');
+  document.getElementById('bookPreviewContent').innerHTML =
+    '<div style="text-align:center;padding:40px;color:var(--text-secondary)">'+
+    '<i class="fas fa-book" style="font-size:48px;color:var(--accent);margin-bottom:16px;display:block"></i>'+
+    '<p>Journal generated with <strong>'+s.pages+'</strong> pages.</p>'+
+    '<p style="margin-top:8px">Size: '+size.w+'" x '+size.h+'"</p></div>';
+  finishBookGeneration(); showToast('Journal generated!');
+}
+
+// -- Build PDFs --
+function buildImageBookPDF() {
+  var s = bookGenerationState, JPdf = window.jspdf.jsPDF, size = s.size;
+  var bleed = s.useBleed ? BLEED : 0, pageW = size.w+2*bleed, pageH = size.h+2*bleed;
+  var doc = new JPdf({ unit:'in', format:[pageW,pageH] });
+  for (var i=0; i<s.images.length; i++) {
+    if (i>0) doc.addPage([pageW,pageH]);
+    try { doc.addImage(s.images[i],'PNG',0,0,pageW,pageH); }
+    catch(_) { doc.setFillColor(255,255,255); doc.rect(0,0,pageW,pageH,'F');
+      doc.setFontSize(12); doc.setTextColor(150); doc.text('Page '+(i+1),pageW/2,pageH/2,{align:'center'}); }
+  }
+  generatedBookPdfData = doc.output('blob');
+  document.getElementById('bookPreview').classList.remove('hidden');
+}
+
+function buildTextBookPDF() {
+  var s = bookGenerationState, JPdf = window.jspdf.jsPDF, size = s.size;
+  var bleed = s.useBleed ? BLEED : 0, pageW = size.w+2*bleed, pageH = size.h+2*bleed;
+  var margins = calcMargins(s.pages);
+  var doc = new JPdf({ unit:'in', format:[pageW,pageH] });
+  var pageNum = 1;
+  doc.setFont('Helvetica','bold'); doc.setFontSize(28); doc.setTextColor(30,30,30);
+  var titleText = s.outline ? s.outline.title : 'Book';
+  doc.text(doc.splitTextToSize(titleText, size.w*0.7), pageW/2, pageH*0.35, {align:'center'});
+  doc.setFont('Helvetica','normal'); doc.setFontSize(12); doc.setTextColor(120);
+  doc.text('Generated with KDP Book Maker', pageW/2, pageH*0.45, {align:'center'}); pageNum++;
+  for (var c=0; c<s.content.length; c++) {
+    var ch = s.content[c]; doc.addPage([pageW,pageH]); pageNum++;
+    doc.setFont('Helvetica','bold'); doc.setFontSize(20); doc.setTextColor(30,30,30);
+    var isLeft = pageNum%2===0;
+    var textX = bleed+(isLeft ? margins.inside : margins.outside);
+    var textW = size.w-margins.inside-margins.outside;
+    doc.text(ch.title, textX+textW/2, bleed+margins.top+0.6, {align:'center',maxWidth:textW});
+    doc.setFont('Times-Roman','normal'); doc.setFontSize(11); doc.setTextColor(40,40,40);
+    var cleanText = ch.text.replace(/#{1,6}\s*/g,'').replace(/\*\*/g,'').replace(/\*/g,'');
+    var lines = doc.splitTextToSize(cleanText, textW);
+    var y = bleed+margins.top+1.0, pageBottom = bleed+size.h-margins.bottom;
+    for (var li=0; li<lines.length; li++) {
+      if (y+0.2 > pageBottom) {
+        doc.setFont('Helvetica','normal'); doc.setFontSize(9); doc.setTextColor(150);
+        doc.text(String(pageNum), pageW/2, pageBottom+0.15, {align:'center'});
+        doc.addPage([pageW,pageH]); pageNum++;
+        isLeft = pageNum%2===0; textX = bleed+(isLeft ? margins.inside : margins.outside);
+        y = bleed+margins.top+0.3;
+        doc.setFont('Times-Roman','normal'); doc.setFontSize(11); doc.setTextColor(40,40,40);
+      }
+      doc.text(lines[li], textX, y); y+=0.2;
+    }
+    doc.setFont('Helvetica','normal'); doc.setFontSize(9); doc.setTextColor(150);
+    doc.text(String(pageNum), pageW/2, pageBottom+0.15, {align:'center'});
+  }
+  generatedBookPdfData = doc.output('blob');
+  document.getElementById('bookPreview').classList.remove('hidden');
+}
+
+// -- Previews --
+function showBookPreviewText() {
+  var s = bookGenerationState, el = document.getElementById('bookPreviewContent'), html = '';
+  if (s.outline) html += '<div class="preview-page"><h2>'+escapeHtml(s.outline.title)+'</h2><p style="color:#888">Generated with KDP Book Maker</p></div>';
+  s.content.forEach(function(ch,i) {
+    var t = ch.text.substring(0,600);
+    html += '<div class="preview-page"><h2>Chapter '+(i+1)+': '+escapeHtml(ch.title)+'</h2><div>'+
+      marked.parse(t)+(ch.text.length>600?'<p style="color:#aaa;font-style:italic">... continues ...</p>':'')+
+      '</div><div class="preview-page-num">'+(i+2)+'</div></div>';
+  });
+  el.innerHTML = html; document.getElementById('bookPreview').classList.remove('hidden');
+}
+
+function showBookPreviewImages() {
+  var s = bookGenerationState, el = document.getElementById('bookPreviewContent');
+  var max = Math.min(s.images.length,20), html = '<div class="preview-image-grid">';
+  for (var i=0; i<max; i++) html += '<img src="'+s.images[i]+'" alt="Page '+(i+1)+'" loading="lazy">';
+  if (s.images.length>max) html += '<div style="display:flex;align-items:center;justify-content:center;padding:20px;color:var(--text-secondary)">+ '+(s.images.length-max)+' more pages</div>';
+  html += '</div>'; el.innerHTML = html; document.getElementById('bookPreview').classList.remove('hidden');
+}
+
+// -- PDF Download --
+function downloadBookPDF() {
+  if (!generatedBookPdfData) { showToast('No PDF generated yet.','error'); return; }
+  var s = bookGenerationState;
+  var fn = (s.outline ? s.outline.title.replace(/[^a-zA-Z0-9\u00C0-\u024F]/g,'_').substring(0,50) : 'book')+'_KDP.pdf';
+  triggerDownload(generatedBookPdfData, fn, 'application/pdf');
+}
+function previewBookPDF() {
+  if (!generatedBookPdfData) { showToast('No PDF generated yet.','error'); return; }
+  window.open(URL.createObjectURL(generatedBookPdfData),'_blank');
+}
+function triggerDownload(blob, filename, mimeType) {
+  var url = URL.createObjectURL(blob instanceof Blob ? blob : new Blob([blob],{type:mimeType}));
+  var a = document.createElement('a'); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(function() { URL.revokeObjectURL(url); a.remove(); }, 100);
+}
+
+// ================================
+// COVER GENERATION
+// ================================
+async function startCoverGeneration() {
+  if (!requireAuth()) return;
+  var sizeKey = document.getElementById('coverSize').value;
+  var pages = parseInt(document.getElementById('coverPages').value) || 100;
+  var paper = document.getElementById('coverPaper').value;
+  var prompt = document.getElementById('coverPrompt').value.trim();
+  var spineText = document.getElementById('coverSpineText').value.trim();
+  var backPrompt = document.getElementById('coverBackPrompt').value.trim();
+  var spineColor = document.getElementById('coverSpineColor').value;
+  if (!prompt) { showToast('Please enter a cover description.','error'); return; }
+  var size = getSize(sizeKey), spineWidth = calcSpineWidth(pages, paper);
+  coverGenerationState = { active:true, frontImg:null, backImg:null, size:size, pages:pages, paper:paper, spineText:spineText, spineColor:spineColor, spineWidth:spineWidth };
+  document.getElementById('btnGenerateCover').disabled = true;
+  document.getElementById('coverProgress').classList.remove('hidden');
+  document.getElementById('coverPreview').classList.add('hidden');
+  generatedCoverPdfData = null;
+  var sizeKey2 = size.h > size.w ? 'portrait' : 'landscape';
+  if (Math.abs(size.w-size.h)<0.5) sizeKey2 = 'square';
+  try {
+    setProgress('coverProgressBar','coverProgressLabel','coverProgressPercent',10,'Generating front cover...');
+    var frontUrls = await apiGenerateImage('Professional book cover design, '+prompt+', high quality, detailed, publishing quality, no text overlays', sizeKey2);
+    if (!frontUrls || frontUrls.length===0) throw new Error('Front cover not generated');
+    coverGenerationState.frontImg = await fetchImageAsBase64(frontUrls[0]);
+    setProgress('coverProgressBar','coverProgressLabel','coverProgressPercent',50,'Generating back cover...');
+    var backDesc = backPrompt || 'matching back cover design, complementary to front, subtle elegant pattern';
+    var backUrls = await apiGenerateImage('Professional book back cover design, '+backDesc+', same style, publishing quality, no text', sizeKey2);
+    if (backUrls && backUrls.length>0) coverGenerationState.backImg = await fetchImageAsBase64(backUrls[0]);
+    setProgress('coverProgressBar','coverProgressLabel','coverProgressPercent',85,'Building cover PDF...');
+    buildCoverPDF();
+    setProgress('coverProgressBar','coverProgressLabel','coverProgressPercent',100,'Done!');
+    showCoverPreview(); showToast('Cover generated!');
+  } catch (e) { showToast('Error: '+e.message,'error'); }
+  document.getElementById('btnGenerateCover').disabled = false;
+}
+
+function buildCoverPDF() {
+  var cs = coverGenerationState, JPdf = window.jspdf.jsPDF, size = cs.size, spineW = cs.spineWidth;
+  var totalW = BLEED+size.w+spineW+size.w+BLEED, totalH = BLEED+size.h+BLEED;
+  var doc = new JPdf({ unit:'in', format:[totalW,totalH], orientation: totalW>totalH?'landscape':'portrait' });
+  if (cs.backImg) { try { doc.addImage(cs.backImg,'PNG',0,0,BLEED+size.w,totalH); } catch(_){} }
+  else { doc.setFillColor(240,240,240); doc.rect(0,0,BLEED+size.w,totalH,'F'); }
+  if (cs.frontImg) { try { doc.addImage(cs.frontImg,'PNG',BLEED+size.w+spineW,0,size.w+BLEED,totalH); } catch(_){} }
+  var hex = cs.spineColor.replace('#','');
+  var r = parseInt(hex.substring(0,2),16), g = parseInt(hex.substring(2,4),16), b = parseInt(hex.substring(4,6),16);
+  doc.setFillColor(r,g,b); doc.rect(BLEED+size.w,0,spineW,totalH,'F');
+  if (cs.spineText && spineW>0.2) {
+    doc.setFont('Helvetica','bold'); doc.setFontSize(Math.min(14,spineW*50));
+    var bright = (r*299+g*587+b*114)/1000;
+    doc.setTextColor(bright>128?20:240, bright>128?20:240, bright>128?20:240);
+    doc.text(cs.spineText, BLEED+size.w+spineW/2, totalH/2, {angle:90,align:'center'});
+  }
+  doc.setDrawColor(180,180,180); doc.setLineWidth(0.003);
+  doc.line(BLEED,0,BLEED,BLEED*0.5); doc.line(0,BLEED,BLEED*0.5,BLEED);
+  doc.line(totalW-BLEED,0,totalW-BLEED,BLEED*0.5); doc.line(totalW,BLEED,totalW-BLEED*0.5,BLEED);
+  doc.line(BLEED,totalH,BLEED,totalH-BLEED*0.5); doc.line(0,totalH-BLEED,BLEED*0.5,totalH-BLEED);
+  doc.line(totalW-BLEED,totalH,totalW-BLEED,totalH-BLEED*0.5); doc.line(totalW,totalH-BLEED,totalW-BLEED*0.5,totalH-BLEED);
+  generatedCoverPdfData = doc.output('blob');
+}
+
+function showCoverPreview() {
+  var cs = coverGenerationState, el = document.getElementById('coverPreviewContent'), html = '';
+  if (cs.frontImg) html += '<img class="cover-preview-img" src="'+cs.frontImg+'" alt="Front Cover">';
+  html += '<div class="cover-specs">';
+  html += '<div class="cover-spec"><strong>Size:</strong> '+cs.size.w+'" x '+cs.size.h+'"</div>';
+  html += '<div class="cover-spec"><strong>Spine:</strong> '+cs.spineWidth.toFixed(3)+'"</div>';
+  html += '<div class="cover-spec"><strong>Pages:</strong> '+cs.pages+'</div>';
+  html += '<div class="cover-spec"><strong>Total Width:</strong> '+(BLEED*2+cs.size.w*2+cs.spineWidth).toFixed(3)+'"</div>';
+  html += '<div class="cover-spec"><strong>Total Height:</strong> '+(BLEED*2+cs.size.h).toFixed(3)+'"</div>';
+  html += '<div class="cover-spec"><strong>Bleed:</strong> '+BLEED+'"</div></div>';
+  el.innerHTML = html; document.getElementById('coverPreview').classList.remove('hidden');
+}
+
+function downloadCoverPDF() {
+  if (!generatedCoverPdfData) { showToast('No cover generated yet.','error'); return; }
+  triggerDownload(generatedCoverPdfData, 'Cover_KDP.pdf', 'application/pdf');
+}
+
+// ================================
+// KEYWORD RESEARCH
+// ================================
+async function startKeywordResearch() {
+  if (!requireAuth()) return;
+  var title = document.getElementById('kwTitle').value.trim();
+  var category = document.getElementById('kwCategory').value.trim();
+  var lang = document.getElementById('kwLang').value;
+  if (!title) { showToast('Please enter a book title.','error'); return; }
+  document.getElementById('btnGenerateKw').disabled = true;
+  document.getElementById('kwProgress').classList.remove('hidden');
+  document.getElementById('kwResults').classList.add('hidden');
+  var langName = {en:'English',de:'German',fr:'French',es:'Spanish',it:'Italian',ro:'Romanian'}[lang] || 'English';
+  var kwPrompt = 'You are an Amazon KDP keyword research expert. For the book titled "'+title+'"'+
+    (category ? ' in the category/niche "'+category+'"' : '')+
+    ', generate exactly 7 Amazon backend keywords (search terms) in '+langName+'. These should be based on what real buyers search on Amazon. Each keyword phrase up to 50 characters. Focus on high-volume, relevant terms. Return ONLY a JSON array of 7 strings, nothing else.';
+  try {
+    var response = await apiGenerateText(kwPrompt, 1024);
+    var jsonMatch = response.match(/\[[\s\S]*?\]/);
+    if (!jsonMatch) throw new Error('Could not generate keywords');
+    var keywords = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(keywords) || keywords.length === 0) throw new Error('Invalid format');
+    displayKeywords(keywords.slice(0,7)); showToast('7 keywords generated!');
+  } catch (e) { showToast('Error: '+e.message,'error'); }
+  document.getElementById('btnGenerateKw').disabled = false;
+  document.getElementById('kwProgress').classList.add('hidden');
+}
+
+function displayKeywords(keywords) {
+  var container = document.getElementById('kwResults');
+  var html = '<h3 style="font-size:1.2rem;margin-bottom:16px"><i class="fas fa-key accent"></i> Generated Keywords</h3>';
+  keywords.forEach(function(kw, i) {
+    html += '<div class="keyword-item"><span class="keyword-num">'+(i+1)+'</span>'+
+      '<span class="keyword-text">'+escapeHtml(kw)+'</span>'+
+      '<button class="keyword-copy" data-kw="'+encodeURIComponent(kw)+'"><i class="fas fa-copy"></i> Copy</button></div>';
+  });
+  var allKw = keywords.join(', ');
+  html += '<div class="copy-all-bar"><span>Copy all 7 keywords at once</span>'+
+    '<button class="btn btn-primary btn-sm" id="btnCopyAllKw" data-all="'+encodeURIComponent(allKw)+'"><i class="fas fa-clipboard"></i> Copy All</button></div>';
+  container.innerHTML = html; container.classList.remove('hidden');
+  container.querySelectorAll('.keyword-copy').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      doCopy(this, decodeURIComponent(this.getAttribute('data-kw')), '<i class="fas fa-copy"></i> Copy');
+    });
+  });
+  var copyAllBtn = document.getElementById('btnCopyAllKw');
+  if (copyAllBtn) copyAllBtn.addEventListener('click', function() {
+    doCopy(this, decodeURIComponent(this.getAttribute('data-all')), '<i class="fas fa-clipboard"></i> Copy All');
+    showToast('All keywords copied!');
+  });
+}
+
+function doCopy(btn, text, resetHtml) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function() {
+      btn.classList.add('copied'); btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+      setTimeout(function() { btn.classList.remove('copied'); btn.innerHTML = resetHtml; }, 2000);
+    });
+  }
+}
+
+// ================================
+// ADMIN PANEL
+// ================================
+async function loadAdminUsers() {
+  try {
+    var res = await fetch('/api/admin/users', { headers: getAuthHeaders() });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    var tbody = document.getElementById('adminUsersBody');
+    var html = '';
+    data.users.forEach(function(u) {
+      var d = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-';
+      html += '<tr><td>'+escapeHtml(u.email)+'</td><td>'+escapeHtml(u.name||'-')+'</td>'+
+        '<td><select onchange="changeSubscription(\''+encodeURIComponent(u.email)+'\',this.value)">'+
+        '<option value="free"'+(u.subscription==='free'?' selected':'')+'>Free</option>'+
+        '<option value="basic"'+(u.subscription==='basic'?' selected':'')+'>Basic</option>'+
+        '<option value="pro"'+(u.subscription==='pro'?' selected':'')+'>Pro</option>'+
+        '</select></td><td>'+d+'</td>'+
+        '<td>'+(u.role==='admin'?'<em>Admin</em>':'<button class="btn btn-danger btn-sm" onclick="deleteUser(\''+encodeURIComponent(u.email)+'\')"><i class="fas fa-trash"></i></button>')+'</td></tr>';
+    });
+    tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No users yet</td></tr>';
+  } catch (e) { showToast('Error loading users: '+e.message,'error'); }
+}
+
+async function changeSubscription(encodedEmail, sub) {
+  try {
+    var res = await fetch('/api/admin/users/'+encodedEmail+'/subscription', {
+      method:'POST', headers:getAuthHeaders(), body:JSON.stringify({subscription:sub})
+    });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    showToast('Subscription updated!');
+  } catch (e) { showToast('Error: '+e.message,'error'); }
+}
+
+async function deleteUser(encodedEmail) {
+  var email = decodeURIComponent(encodedEmail);
+  showConfirmDialog('Delete user "'+email+'"? This action cannot be undone.', async function() {
+    try {
+      var res = await fetch('/api/admin/users/'+encodedEmail, { method:'DELETE', headers:getAuthHeaders() });
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      showToast('User deleted.'); loadAdminUsers();
+    } catch (e) { showToast('Error: '+e.message,'error'); }
+  });
+}
+
+function showConfirmDialog(message, onConfirm) {
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML =
+    '<div class="modal-box"><h3>Confirm</h3><p>'+message+'</p>'+
+    '<div class="modal-actions"><button class="btn btn-secondary btn-sm" data-action="cancel">Cancel</button>'+
+    '<button class="btn btn-danger btn-sm" data-action="confirm">Confirm</button></div></div>';
+  document.body.appendChild(overlay);
+  overlay.querySelector('[data-action="cancel"]').addEventListener('click', function() { overlay.remove(); });
+  overlay.querySelector('[data-action="confirm"]').addEventListener('click', function() { overlay.remove(); if (onConfirm) onConfirm(); });
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+}
+
+// ================================
+// UTILITY
+// ================================
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
+}
+
+// ================================
+// INIT
+// ================================
+navigate('dashboard');
+updateAuthUI();
+</script>
+</body>
+</html>
