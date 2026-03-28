@@ -18,7 +18,15 @@ const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@example.com').toLowerCase
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
+
+// ─── Plan Limits ───
+const PLAN_LIMITS = {
+  free: { books: 0, covers: 0, coloringBooks: 0, keywords: 0, maxBookPages: 0, maxColoringPages: 0 },
+  basic: { books: 10, covers: 10, coloringBooks: 5, keywords: 20, maxBookPages: 100, maxColoringPages: 50 },
+  pro: { books: 30, covers: 30, coloringBooks: 15, keywords: 999999, maxBookPages: 500, maxColoringPages: 150 }
+};
 
 // ─── Middleware ───
 // Stripe webhook needs raw body
@@ -29,6 +37,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ─── Simple User Store (JSON file) ───
 const DATA_DIR = path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const USAGE_FILE = path.join(DATA_DIR, 'usage.json');
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -74,6 +83,63 @@ function updateUser(email, updates) {
     return users[idx];
   }
   return null;
+}
+
+// ─── Usage Tracking ───
+function getCurrentMonth() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function getUsageData() {
+  ensureDataDir();
+  try {
+    return JSON.parse(fs.readFileSync(USAGE_FILE, 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+function saveUsageData(data) {
+  ensureDataDir();
+  fs.writeFileSync(USAGE_FILE, JSON.stringify(data, null, 2));
+}
+
+function getUserUsage(email) {
+  var data = getUsageData();
+  var month = getCurrentMonth();
+  var key = email.toLowerCase().trim();
+  if (!data[key] || data[key].month !== month) {
+    data[key] = { month: month, books: 0, covers: 0, coloringBooks: 0, keywords: 0 };
+    saveUsageData(data);
+  }
+  return data[key];
+}
+
+function incrementUsage(email, type) {
+  var data = getUsageData();
+  var month = getCurrentMonth();
+  var key = email.toLowerCase().trim();
+  if (!data[key] || data[key].month !== month) {
+    data[key] = { month: month, books: 0, covers: 0, coloringBooks: 0, keywords: 0 };
+  }
+  data[key][type] = (data[key][type] || 0) + 1;
+  saveUsageData(data);
+  return data[key];
+}
+
+function checkLimit(email, role, subscription, usageType) {
+  if (role === 'admin') return { allowed: true };
+  var sub = subscription || 'free';
+  var limits = PLAN_LIMITS[sub] || PLAN_LIMITS.free;
+  if (sub === 'free') return { allowed: false, message: 'Active subscription required. Please choose a plan.' };
+  var usage = getUserUsage(email);
+  var current = usage[usageType] || 0;
+  var limit = limits[usageType];
+  if (limit !== undefined && current >= limit) {
+    return { allowed: false, message: 'Monthly limit reached for ' + usageType + ' (' + limit + '). Upgrade your plan for more.' };
+  }
+  return { allowed: true };
 }
 
 // ─── Password Hashing (Node.js crypto, no external deps) ───
@@ -203,15 +269,34 @@ app.get('/api/auth/me', authMiddleware, (req, res) => {
 });
 
 // ════════════════════════════════════════
+// USAGE ROUTE
+// ════════════════════════════════════════
+
+app.get('/api/usage', authMiddleware, (req, res) => {
+  const user = findUser(req.user.email);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  var usage = getUserUsage(req.user.email);
+  var sub = user.subscription || 'free';
+  var limits = PLAN_LIMITS[sub] || PLAN_LIMITS.free;
+  res.json({ usage: usage, limits: limits, subscription: sub });
+});
+
+// ════════════════════════════════════════
 // AI GENERATION ROUTES
 // ════════════════════════════════════════
 
 // ── Text generation (non-streaming) ──
 app.post('/api/generate/text', authMiddleware, subscribedMiddleware, async (req, res) => {
-  const { prompt, maxTokens } = req.body;
+  const { prompt, maxTokens, usageType } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
   if (!ANTHROPIC_API_KEY) {
     return res.status(500).json({ error: 'Text generation is not configured. Admin must add ANTHROPIC_API_KEY.' });
+  }
+
+  // Check usage limits
+  if (usageType) {
+    var limitCheck = checkLimit(req.user.email, req.user.role, req.user.subscription, usageType);
+    if (!limitCheck.allowed) return res.status(403).json({ error: limitCheck.message });
   }
 
   try {
@@ -236,6 +321,7 @@ app.post('/api/generate/text', authMiddleware, subscribedMiddleware, async (req,
 
     const data = await response.json();
     const text = data.content && data.content[0] ? data.content[0].text : '';
+    if (usageType) incrementUsage(req.user.email, usageType);
     res.json({ content: text });
   } catch (error) {
     console.error('Text generation error:', error.message);
@@ -245,10 +331,16 @@ app.post('/api/generate/text', authMiddleware, subscribedMiddleware, async (req,
 
 // ── Text generation (streaming via SSE) ──
 app.post('/api/generate/text-stream', authMiddleware, subscribedMiddleware, async (req, res) => {
-  const { prompt, maxTokens } = req.body;
+  const { prompt, maxTokens, usageType } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
   if (!ANTHROPIC_API_KEY) {
     return res.status(500).json({ error: 'Text generation is not configured.' });
+  }
+
+  // Check usage limits
+  if (usageType) {
+    var limitCheck = checkLimit(req.user.email, req.user.role, req.user.subscription, usageType);
+    if (!limitCheck.allowed) return res.status(403).json({ error: limitCheck.message });
   }
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -309,6 +401,7 @@ app.post('/api/generate/text-stream', authMiddleware, subscribedMiddleware, asyn
       }
     }
 
+    if (usageType) incrementUsage(req.user.email, usageType);
     res.write('data: ' + JSON.stringify({ done: true, text: fullText }) + '\n\n');
     res.end();
   } catch (error) {
@@ -320,10 +413,16 @@ app.post('/api/generate/text-stream', authMiddleware, subscribedMiddleware, asyn
 
 // ── Image generation ──
 app.post('/api/generate/image', authMiddleware, subscribedMiddleware, async (req, res) => {
-  const { prompt, size, quality } = req.body;
+  const { prompt, size, quality, usageType } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
   if (!OPENAI_API_KEY) {
     return res.status(500).json({ error: 'Image generation is not configured. Admin must add OPENAI_API_KEY.' });
+  }
+
+  // Check usage limits
+  if (usageType) {
+    var limitCheck = checkLimit(req.user.email, req.user.role, req.user.subscription, usageType);
+    if (!limitCheck.allowed) return res.status(403).json({ error: limitCheck.message });
   }
 
   // Map aspect-like requests to DALL-E 3 sizes
@@ -357,6 +456,7 @@ app.post('/api/generate/image', authMiddleware, subscribedMiddleware, async (req
 
     const data = await response.json();
     const urls = data.data ? data.data.map(d => d.url) : [];
+    if (usageType) incrementUsage(req.user.email, usageType);
     res.json({ urls });
   } catch (error) {
     console.error('Image generation error:', error.message);
@@ -425,8 +525,8 @@ app.delete('/api/admin/users/:email', authMiddleware, adminMiddleware, (req, res
 async function handleStripeWebhook(req, res) {
   let event;
 
-  if (STRIPE_WEBHOOK_SECRET) {
-    const stripe = require('stripe')(STRIPE_WEBHOOK_SECRET);
+  if (STRIPE_SECRET_KEY && STRIPE_WEBHOOK_SECRET) {
+    const stripe = require('stripe')(STRIPE_SECRET_KEY);
     const sig = req.headers['stripe-signature'];
     try {
       event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET);
@@ -451,7 +551,7 @@ async function handleStripeWebhook(req, res) {
       // Determine plan from amount
       const amount = session.amount_total;
       let plan = 'basic';
-      if (amount >= 24900) plan = 'pro'; // $249 annual
+      if (amount >= 34900) plan = 'pro'; // $349 annual
       else if (amount >= 4900) plan = 'pro'; // $49 monthly
 
       const user = updateUser(customerEmail, { subscription: plan });
@@ -490,6 +590,6 @@ app.listen(PORT, () => {
   console.log('  Admin email: ' + ADMIN_EMAIL);
   console.log('  Anthropic API: ' + (ANTHROPIC_API_KEY ? 'Configured' : 'NOT SET'));
   console.log('  OpenAI API:    ' + (OPENAI_API_KEY ? 'Configured' : 'NOT SET'));
-  console.log('  Stripe:        ' + (STRIPE_WEBHOOK_SECRET ? 'Configured' : 'NOT SET'));
+  console.log('  Stripe:        ' + (STRIPE_SECRET_KEY ? 'Configured' : 'NOT SET'));
   console.log('═══════════════════════════════════════');
 });

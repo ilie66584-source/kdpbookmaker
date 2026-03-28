@@ -6,6 +6,7 @@
 2. **Render account** (free): https://render.com
 3. **Anthropic API key** (for text generation): https://console.anthropic.com
 4. **OpenAI API key** (for image generation): https://platform.openai.com/api-keys
+5. **Stripe account** (for payments): https://dashboard.stripe.com
 
 ## Step-by-Step Deployment
 
@@ -41,21 +42,33 @@ In your Render dashboard, go to your service → **Environment**:
 |-----|-------|
 | `ADMIN_EMAIL` | ilie1980@myyahoo.com |
 | `ADMIN_PASSWORD` | (your password) |
-| `ANTHROPIC_API_KEY` | sk-ant-... (get from console.anthropic.com) |
-| `OPENAI_API_KEY` | sk-... (get from platform.openai.com) |
 | `JWT_SECRET` | (click "Generate" or type a random long string) |
-| `STRIPE_WEBHOOK_SECRET` | whsec-... (optional, from Stripe dashboard) |
+| `ANTHROPIC_API_KEY` | (your Anthropic API key from console.anthropic.com) |
+| `OPENAI_API_KEY` | (your OpenAI API key from platform.openai.com) |
+| `STRIPE_SECRET_KEY` | (your Stripe secret key from dashboard.stripe.com/apikeys) |
+| `STRIPE_WEBHOOK_SECRET` | (optional - from Stripe webhook settings) |
 
 ### Step 4: Connect Your Domain
 
 1. In Render → your service → **Settings** → **Custom Domains**
 2. Click **"Add Custom Domain"**
-3. Enter: `kdpbookmaker.net`
-4. Render will show you DNS records to add
-5. Go to your domain registrar (where you bought kdpbookmaker.net)
-6. Add the DNS records Render tells you
-7. Wait 5-30 minutes for DNS propagation
-8. Render auto-generates SSL certificate (HTTPS)
+3. Enter: `www.kdpbookmaker.net`
+4. Add DNS records at your domain registrar:
+   - **CNAME**: `www` → `kdpbookmaker.onrender.com`
+   - **URL Redirect**: `@` → `https://www.kdpbookmaker.net`
+   - **A Record**: `@` → `216.24.57.1`
+5. Wait 5-30 minutes for DNS propagation
+6. Render auto-generates SSL certificate (HTTPS)
+
+## Subscription Plans
+
+| Plan | Price | Limits |
+|------|-------|--------|
+| **KDP Bookmaker — Base** | $29/month | 10 text books (100pg max), 5 coloring books (50pg max), 10 covers, 20 keywords |
+| **KDP Bookmaker — Pro** | $49/month | 30 text books (500pg max), 15 coloring books (150pg max), 30 covers, unlimited keywords |
+| **KDP Bookmaker — Pro Annuale** | $349/year | Same as Pro, save $239/year |
+
+All plans include unlimited mandalas & journals (no API costs).
 
 ## API Cost Estimates
 
