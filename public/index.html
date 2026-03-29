@@ -1016,7 +1016,7 @@ function generateMandalaImage(size, seed) {
   var cR=maxR*0.1;
   for (var j=0;j<symmetry;j++) { var a2=(2*Math.PI*j)/symmetry; ctx.save(); ctx.translate(cx,cy); ctx.rotate(a2); ctx.beginPath(); ctx.moveTo(0,0); ctx.bezierCurveTo(cR*0.5,-cR*0.3,cR*0.5,-cR*0.7,0,-cR); ctx.bezierCurveTo(-cR*0.5,-cR*0.7,-cR*0.5,-cR*0.3,0,0); ctx.stroke(); ctx.restore(); }
   ctx.beginPath(); ctx.arc(cx,cy,cR*0.25,0,Math.PI*2); ctx.fill();
-  return canvas.toDataURL('image/png');
+  return canvas.toDataURL('image/jpeg', 0.92);
 }
 
 // ================================
@@ -1074,30 +1074,41 @@ function finishBookGeneration() {
   document.getElementById('btnCancelBook').classList.add('hidden');
 }
 
-// -- Mandala Book (programmatic, no API) --
+// -- Mandala Book (programmatic, no API — incremental PDF build) --
 function generateMandalaBook() {
-  var s = bookGenerationState, totalPages = s.pages, imgSize = 2400;
+  var s = bookGenerationState, totalPages = s.pages, imgSize = 1500;
+  var JPdf = window.jspdf.jsPDF, size = s.size;
+  var bleed = s.useBleed ? BLEED : 0, pageW = size.w+2*bleed, pageH = size.h+2*bleed;
+  var doc = new JPdf({ unit:'in', format:[pageW,pageH] });
   setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',0,'Generating mandalas...');
-  s.images = []; var batchSize = 5, idx = 0;
-  function processBatch() {
-    if (s.cancelled || idx >= totalPages) { onDone(); return; }
-    var end = Math.min(idx+batchSize, totalPages);
-    for (var i=idx; i<end; i++) {
-      s.images.push(generateMandalaImage(imgSize, i*7919+42+Math.floor(s.prompt.length*31)));
-    }
-    idx = end;
-    setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',(idx/totalPages)*90,'Mandalas: '+idx+' / '+totalPages);
-    setTimeout(processBatch, 10);
+  var previewImages = [];
+  var idx = 0;
+  function processPage() {
+    if (s.cancelled) { finishBookGeneration(); return; }
+    if (idx >= totalPages) { onDone(); return; }
+    if (idx > 0) doc.addPage([pageW, pageH]);
+    var imgData = generateMandalaImage(imgSize, idx*7919+42+Math.floor(s.prompt.length*31));
+    try { doc.addImage(imgData, 'JPEG', 0, 0, pageW, pageH); } catch(e) { /* skip page */ }
+    if (idx < 8) previewImages.push(imgData);
+    idx++;
+    setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',
+      (idx/totalPages)*95, 'Mandalas: '+idx+' / '+totalPages);
+    setTimeout(processPage, 5);
   }
-  processBatch();
+  processPage();
   function onDone() {
-    if (s.cancelled) return;
-    setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',95,'Creating PDF...');
+    setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',97,'Creating PDF...');
     setTimeout(function() {
-      try { buildImageBookPDF(); setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',100,'Done!');
-        showBookPreviewImages(); finishBookGeneration(); showToast('Mandala book generated!');
+      try {
+        generatedBookPdfData = doc.output('blob');
+        s.images = previewImages;
+        s.totalPageCount = totalPages;
+        showBookPreviewImages();
+        setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',100,'Done!');
+        finishBookGeneration();
+        showToast('Mandala book generated! ('+totalPages+' pages)');
       } catch (e) { showToast('PDF error: '+e.message,'error'); finishBookGeneration(); }
-    }, 50);
+    }, 100);
   }
 }
 
@@ -1126,16 +1137,17 @@ async function generateImageBook() {
         }
       } catch (err) {
         // Fallback to mandala if image gen fails
-        s.images.push(generateMandalaImage(2400, generated*1337));
+        s.images.push(generateMandalaImage(1500, generated*1337));
         generated++;
       }
     }
   } catch (e) { if (!s.cancelled) showToast('Error: '+e.message,'error'); }
   if (s.cancelled && s.images.length === 0) { finishBookGeneration(); return; }
+  var totalGenerated = s.images.length;
   setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',95,'Creating PDF...');
   setTimeout(function() {
     try { buildImageBookPDF(); setProgress('bookProgressBar','bookProgressLabel','bookProgressPercent',100,'Done!');
-      showBookPreviewImages(); finishBookGeneration(); showToast('Book generated! ('+s.images.length+' pages)');
+      showBookPreviewImages(); finishBookGeneration(); showToast('Book generated! ('+totalGenerated+' pages)');
     } catch (e) { showToast('PDF error: '+e.message,'error'); finishBookGeneration(); }
   }, 50);
 }
@@ -1214,13 +1226,22 @@ function buildImageBookPDF() {
   var s = bookGenerationState, JPdf = window.jspdf.jsPDF, size = s.size;
   var bleed = s.useBleed ? BLEED : 0, pageW = size.w+2*bleed, pageH = size.h+2*bleed;
   var doc = new JPdf({ unit:'in', format:[pageW,pageH] });
-  for (var i=0; i<s.images.length; i++) {
+  var totalImages = s.images.length;
+  var previewImages = [];
+  for (var i=0; i<totalImages; i++) {
     if (i>0) doc.addPage([pageW,pageH]);
-    try { doc.addImage(s.images[i],'PNG',0,0,pageW,pageH); }
-    catch(_) { doc.setFillColor(255,255,255); doc.rect(0,0,pageW,pageH,'F');
-      doc.setFontSize(12); doc.setTextColor(150); doc.text('Page '+(i+1),pageW/2,pageH/2,{align:'center'}); }
+    try {
+      var fmt = s.images[i].indexOf('data:image/jpeg') === 0 ? 'JPEG' : 'PNG';
+      doc.addImage(s.images[i], fmt, 0, 0, pageW, pageH);
+    } catch(_) {
+      doc.setFillColor(255,255,255); doc.rect(0,0,pageW,pageH,'F');
+      doc.setFontSize(12); doc.setTextColor(150); doc.text('Page '+(i+1),pageW/2,pageH/2,{align:'center'});
+    }
+    if (i < 8) previewImages.push(s.images[i]);
   }
   generatedBookPdfData = doc.output('blob');
+  s.images = previewImages;
+  s.totalPageCount = totalImages;
   document.getElementById('bookPreview').classList.remove('hidden');
 }
 
@@ -1279,9 +1300,15 @@ function showBookPreviewText() {
 
 function showBookPreviewImages() {
   var s = bookGenerationState, el = document.getElementById('bookPreviewContent');
-  var max = Math.min(s.images.length,20), html = '<div class="preview-image-grid">';
-  for (var i=0; i<max; i++) html += '<img src="'+s.images[i]+'" alt="Page '+(i+1)+'" loading="lazy">';
-  if (s.images.length>max) html += '<div style="display:flex;align-items:center;justify-content:center;padding:20px;color:var(--text-secondary)">+ '+(s.images.length-max)+' more pages</div>';
+  var totalCount = s.totalPageCount || s.images.length;
+  var displayImages = s.images;
+  var max = Math.min(displayImages.length, 8);
+  var html = '<div style="text-align:center;margin-bottom:16px;padding:12px;background:var(--bg-surface);border:1px solid var(--accent-dim);border-radius:8px">' +
+    '<i class="fas fa-book" style="color:var(--accent);margin-right:8px"></i>' +
+    '<strong style="font-size:1.1rem">' + totalCount + ' pages generated successfully</strong></div>';
+  html += '<div class="preview-image-grid">';
+  for (var i=0; i<max; i++) html += '<img src="'+displayImages[i]+'" alt="Page '+(i+1)+'" loading="lazy">';
+  if (totalCount > max) html += '<div style="display:flex;align-items:center;justify-content:center;padding:20px;color:var(--text-secondary);font-size:1.05rem"><strong>+ '+(totalCount-max)+' more pages in the PDF</strong></div>';
   html += '</div>'; el.innerHTML = html; document.getElementById('bookPreview').classList.remove('hidden');
 }
 
@@ -1327,12 +1354,12 @@ async function startCoverGeneration() {
   if (Math.abs(size.w-size.h)<0.5) sizeKey2 = 'square';
   try {
     setProgress('coverProgressBar','coverProgressLabel','coverProgressPercent',10,'Generating front cover...');
-    var frontUrls = await apiGenerateImage('Professional book cover design, '+prompt+', high quality, detailed, publishing quality, no text overlays', sizeKey2, 'covers');
+    var frontUrls = await apiGenerateImage('Flat edge-to-edge illustration artwork for a printed book front cover, '+prompt+', high quality, vibrant, detailed, print-ready seamless design filling the entire image, NOT a 3D rendering of a book, NOT books on a table, NOT a mockup, no text, no title, no author name, no lettering', sizeKey2, 'covers');
     if (!frontUrls || frontUrls.length===0) throw new Error('Front cover not generated');
     coverGenerationState.frontImg = await fetchImageAsBase64(frontUrls[0]);
     setProgress('coverProgressBar','coverProgressLabel','coverProgressPercent',50,'Generating back cover...');
-    var backDesc = backPrompt || 'matching back cover design, complementary to front, subtle elegant pattern';
-    var backUrls = await apiGenerateImage('Professional book back cover design, '+backDesc+', same style, publishing quality, no text', sizeKey2);
+    var backDesc = backPrompt || 'elegant complementary pattern, subtle artistic design matching the front cover style';
+    var backUrls = await apiGenerateImage('Flat edge-to-edge illustration artwork for a printed book back cover, '+backDesc+', print-ready seamless design filling the entire image, NOT a 3D rendering, NOT a mockup, absolutely NO barcode, NO ISBN, NO QR code, NO UPC code, NO price tag, no text, no numbers, no lettering', sizeKey2);
     if (backUrls && backUrls.length>0) coverGenerationState.backImg = await fetchImageAsBase64(backUrls[0]);
     setProgress('coverProgressBar','coverProgressLabel','coverProgressPercent',85,'Building cover PDF...');
     buildCoverPDF();
@@ -1346,9 +1373,10 @@ function buildCoverPDF() {
   var cs = coverGenerationState, JPdf = window.jspdf.jsPDF, size = cs.size, spineW = cs.spineWidth;
   var totalW = BLEED+size.w+spineW+size.w+BLEED, totalH = BLEED+size.h+BLEED;
   var doc = new JPdf({ unit:'in', format:[totalW,totalH], orientation: totalW>totalH?'landscape':'portrait' });
-  if (cs.backImg) { try { doc.addImage(cs.backImg,'PNG',0,0,BLEED+size.w,totalH); } catch(_){} }
+  var detectFmt = function(d) { return d && d.indexOf('data:image/jpeg') === 0 ? 'JPEG' : 'PNG'; };
+  if (cs.backImg) { try { doc.addImage(cs.backImg,detectFmt(cs.backImg),0,0,BLEED+size.w,totalH); } catch(_){} }
   else { doc.setFillColor(240,240,240); doc.rect(0,0,BLEED+size.w,totalH,'F'); }
-  if (cs.frontImg) { try { doc.addImage(cs.frontImg,'PNG',BLEED+size.w+spineW,0,size.w+BLEED,totalH); } catch(_){} }
+  if (cs.frontImg) { try { doc.addImage(cs.frontImg,detectFmt(cs.frontImg),BLEED+size.w+spineW,0,size.w+BLEED,totalH); } catch(_){} }
   var hex = cs.spineColor.replace('#','');
   var r = parseInt(hex.substring(0,2),16), g = parseInt(hex.substring(2,4),16), b = parseInt(hex.substring(4,6),16);
   doc.setFillColor(r,g,b); doc.rect(BLEED+size.w,0,spineW,totalH,'F');
@@ -1367,16 +1395,83 @@ function buildCoverPDF() {
 }
 
 function showCoverPreview() {
-  var cs = coverGenerationState, el = document.getElementById('coverPreviewContent'), html = '';
-  if (cs.frontImg) html += '<img class="cover-preview-img" src="'+cs.frontImg+'" alt="Front Cover">';
+  var cs = coverGenerationState, el = document.getElementById('coverPreviewContent');
+  var size = cs.size, spineW = cs.spineWidth;
+  var totalW = BLEED + size.w + spineW + size.w + BLEED;
+  var backPct = ((BLEED + size.w) / totalW * 100).toFixed(2);
+  var spinePct = Math.max((spineW / totalW * 100), 0.8).toFixed(2);
+  var frontPct = ((size.w + BLEED) / totalW * 100).toFixed(2);
+  var hex = cs.spineColor || '#1a1a2c';
+  var bright = 128;
+  try { var h = hex.replace('#',''); bright = (parseInt(h.substring(0,2),16)*299+parseInt(h.substring(2,4),16)*587+parseInt(h.substring(4,6),16)*114)/1000; } catch(e) {}
+  var spineTextColor = bright > 128 ? '#141414' : '#f0f0f0';
+  var html = '';
+  html += '<div style="text-align:center;margin-bottom:16px;padding:12px;background:var(--bg-surface);border:1px solid var(--accent-dim);border-radius:8px">';
+  html += '<i class="fas fa-palette" style="color:var(--accent);margin-right:8px"></i>';
+  html += '<strong style="font-size:1.1rem">Full Cover Layout (Back + Spine + Front)</strong></div>';
+  html += '<div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px;flex-wrap:wrap">';
+  html += '<button class="btn btn-secondary btn-sm" onclick="regenerateCoverPart(\'front\')"><i class="fas fa-rotate"></i> Regenerate Front</button>';
+  html += '<button class="btn btn-secondary btn-sm" onclick="regenerateCoverPart(\'back\')"><i class="fas fa-rotate"></i> Regenerate Back</button>';
+  html += '</div>';
+  html += '<div style="display:flex;border:2px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:8px;aspect-ratio:'+(totalW/( BLEED*2+size.h)).toFixed(3)+'">';
+  html += '<div style="flex:0 0 '+backPct+'%;overflow:hidden;position:relative">';
+  if (cs.backImg) { html += '<img src="'+cs.backImg+'" style="width:100%;height:100%;object-fit:cover;display:block" alt="Back Cover">'; }
+  else { html += '<div style="width:100%;height:100%;background:#e8e8e8;display:flex;align-items:center;justify-content:center;color:#999;font-size:0.9rem">Back Cover</div>'; }
+  html += '</div>';
+  html += '<div style="flex:0 0 '+spinePct+'%;min-width:6px;background:'+hex+';display:flex;align-items:center;justify-content:center;overflow:hidden">';
+  if (cs.spineText) { html += '<span style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:clamp(5px,0.8vw,10px);white-space:nowrap;color:'+spineTextColor+';font-weight:600;letter-spacing:0.3px">'+escapeHtml(cs.spineText)+'</span>'; }
+  html += '</div>';
+  html += '<div style="flex:0 0 '+frontPct+'%;overflow:hidden;position:relative">';
+  if (cs.frontImg) { html += '<img src="'+cs.frontImg+'" style="width:100%;height:100%;object-fit:cover;display:block" alt="Front Cover">'; }
+  else { html += '<div style="width:100%;height:100%;background:#d8d8d8;display:flex;align-items:center;justify-content:center;color:#999;font-size:0.9rem">Front Cover</div>'; }
+  html += '</div>';
+  html += '</div>';
+  html += '<div style="display:flex;margin-bottom:16px;font-size:0.8rem;color:var(--text-secondary);text-align:center">';
+  html += '<span style="flex:0 0 '+backPct+'%"><i class="fas fa-arrow-left"></i> Back Cover</span>';
+  html += '<span style="flex:0 0 '+spinePct+'%;min-width:40px">Spine</span>';
+  html += '<span style="flex:0 0 '+frontPct+'%">Front Cover <i class="fas fa-arrow-right"></i></span>';
+  html += '</div>';
   html += '<div class="cover-specs">';
-  html += '<div class="cover-spec"><strong>Size:</strong> '+cs.size.w+'" x '+cs.size.h+'"</div>';
+  html += '<div class="cover-spec"><strong>Trim Size:</strong> '+cs.size.w+'" x '+cs.size.h+'"</div>';
   html += '<div class="cover-spec"><strong>Spine:</strong> '+cs.spineWidth.toFixed(3)+'"</div>';
   html += '<div class="cover-spec"><strong>Pages:</strong> '+cs.pages+'</div>';
-  html += '<div class="cover-spec"><strong>Total Width:</strong> '+(BLEED*2+cs.size.w*2+cs.spineWidth).toFixed(3)+'"</div>';
+  html += '<div class="cover-spec"><strong>Total Width:</strong> '+totalW.toFixed(3)+'"</div>';
   html += '<div class="cover-spec"><strong>Total Height:</strong> '+(BLEED*2+cs.size.h).toFixed(3)+'"</div>';
   html += '<div class="cover-spec"><strong>Bleed:</strong> '+BLEED+'"</div></div>';
   el.innerHTML = html; document.getElementById('coverPreview').classList.remove('hidden');
+}
+
+async function regenerateCoverPart(part) {
+  var cs = coverGenerationState;
+  if (!cs.size) { showToast('Please generate a cover first.','error'); return; }
+  var size = cs.size;
+  var sizeKey = size.h > size.w ? 'portrait' : 'landscape';
+  if (Math.abs(size.w-size.h)<0.5) sizeKey = 'square';
+  var prompt = document.getElementById('coverPrompt').value.trim();
+  var backPrompt = document.getElementById('coverBackPrompt').value.trim();
+  document.getElementById('coverProgress').classList.remove('hidden');
+  try {
+    if (part === 'front') {
+      setProgress('coverProgressBar','coverProgressLabel','coverProgressPercent',30,'Regenerating front cover...');
+      var frontUrls = await apiGenerateImage('Flat edge-to-edge illustration artwork for a printed book front cover, '+prompt+', high quality, vibrant, detailed, print-ready seamless design filling the entire image, NOT a 3D rendering of a book, NOT books on a table, NOT a mockup, no text, no title, no author name, no lettering', sizeKey);
+      if (frontUrls && frontUrls.length > 0) {
+        cs.frontImg = await fetchImageAsBase64(frontUrls[0]);
+      }
+    } else {
+      setProgress('coverProgressBar','coverProgressLabel','coverProgressPercent',30,'Regenerating back cover...');
+      var backDesc = backPrompt || 'elegant complementary pattern, subtle artistic design matching the front cover style';
+      var backUrls = await apiGenerateImage('Flat edge-to-edge illustration artwork for a printed book back cover, '+backDesc+', print-ready seamless design filling the entire image, NOT a 3D rendering, NOT a mockup, absolutely NO barcode, NO ISBN, NO QR code, NO UPC code, NO price tag, no text, no numbers, no lettering', sizeKey);
+      if (backUrls && backUrls.length > 0) {
+        cs.backImg = await fetchImageAsBase64(backUrls[0]);
+      }
+    }
+    setProgress('coverProgressBar','coverProgressLabel','coverProgressPercent',80,'Rebuilding cover PDF...');
+    buildCoverPDF();
+    setProgress('coverProgressBar','coverProgressLabel','coverProgressPercent',100,'Done!');
+    showCoverPreview();
+    showToast(part === 'front' ? 'Front cover regenerated!' : 'Back cover regenerated!');
+  } catch (e) { showToast('Error: '+e.message, 'error'); }
+  document.getElementById('coverProgress').classList.add('hidden');
 }
 
 function downloadCoverPDF() {
